@@ -2,7 +2,7 @@
 
 Survey collection + popular-answer guessing game platform.
 
-> **Status:** Milestone 0 (engineering baseline) in progress. No product features exist yet.
+> **Status:** Milestone 0 done. Milestone 1 (invites, accounts, roles, deactivation) implemented and tested. No polls or games yet.
 > Approved product spec: [`docs/spec/The_People_Poll_Master_Specification_v2.md`](docs/spec/The_People_Poll_Master_Specification_v2.md).
 
 ## Quick start

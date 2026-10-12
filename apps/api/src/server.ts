@@ -1,27 +1,53 @@
-import Fastify, { type FastifyBaseLogger, type FastifyError, type FastifyInstance } from 'fastify';
+import cookie from '@fastify/cookie';
+import rateLimit from '@fastify/rate-limit';
+import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
+import { resolveSession, SESSION_COOKIE } from './auth/sessions.js';
+import type { AppDeps } from './core/deps.js';
+import { AppError } from './core/errors.js';
+import { registerAccountRoutes } from './routes/account.js';
+import { registerAuthRoutes } from './routes/auth.js';
 import { registerHealth } from './routes/health.js';
+import { registerStaffRoutes } from './routes/staff.js';
 
-export interface ServerDeps {
-  db: Kysely<unknown>;
-  logger: FastifyBaseLogger;
-}
-
-export function buildServer({ db, logger }: ServerDeps): FastifyInstance {
+export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     // Fastify's default request logs carry method, url, status and timing only — never bodies.
-    loggerInstance: logger,
+    loggerInstance: deps.logger,
+    trustProxy: true,
   }) as unknown as FastifyInstance;
 
-  app.setErrorHandler((err: FastifyError, req, reply) => {
+  await app.register(cookie);
+  await app.register(rateLimit, { global: false });
+
+  app.decorateRequest('auth', null);
+  app.addHook('onRequest', async (req) => {
+    const token = req.cookies[SESSION_COOKIE];
+    req.auth = token ? await resolveSession(deps.db, token, deps.clock()) : null;
+  });
+
+  app.setErrorHandler((err: FastifyError | AppError, req, reply) => {
+    if (err instanceof AppError) {
+      return reply
+        .code(err.status)
+        .send({ error: { code: err.code, message: err.message, ...err.extra } });
+    }
+    if (err.statusCode === 429) {
+      return reply
+        .code(429)
+        .send({ error: { code: 'RATE_LIMITED', message: 'Too many attempts. Try again later' } });
+    }
     req.log.error({ err }, 'unhandled error');
     const status = err.statusCode && err.statusCode < 500 ? err.statusCode : 500;
     // Never echo internal details to clients (spec §18).
-    void reply.code(status).send({
+    return reply.code(status).send({
       error: { code: status === 500 ? 'INTERNAL' : 'BAD_REQUEST', message: 'Request failed' },
     });
   });
 
-  registerHealth(app, db);
+  registerHealth(app, deps.db as unknown as Kysely<unknown>);
+  registerAuthRoutes(app, deps);
+  registerAccountRoutes(app, deps);
+  registerStaffRoutes(app, deps);
   return app;
 }

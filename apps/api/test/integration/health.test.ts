@@ -1,51 +1,48 @@
-// M0-03: /health reports database connectivity.
+// M0-03: /health reports database connectivity; request logs are scrubbed.
+import { Writable } from 'node:stream';
 import { createDb } from '@pplpoll/db';
-import type { Kysely } from 'kysely';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createLogger } from '../../src/logger.js';
 import { buildServer } from '../../src/server.js';
+import { createHarness, type Harness } from '../support/harness.js';
 
-const url = process.env.TEST_DATABASE_URL;
-if (!url) throw new Error('TEST_DATABASE_URL is required for integration tests');
-
-const logger = createLogger({ level: 'silent' });
-const dbs: Kysely<unknown>[] = [];
-
+const harnesses: Harness[] = [];
 afterAll(async () => {
-  await Promise.all(dbs.map((d) => d.destroy()));
+  for (const h of harnesses) await h.close();
 });
 
-function server(connectionString: string) {
-  const db = createDb(connectionString) as unknown as Kysely<unknown>;
-  dbs.push(db);
-  return buildServer({ db, logger });
+async function harness(opts: Parameters<typeof createHarness>[0] = {}) {
+  const h = await createHarness(opts);
+  harnesses.push(h);
+  return h;
 }
 
 describe('GET /health', () => {
   it('returns 200 when the database is reachable', async () => {
-    const res = await server(url).inject({ method: 'GET', url: '/health' });
+    const res = await (await harness()).app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: 'ok', db: 'ok' });
   });
 
   it('returns 503 without leaking details when the database is unreachable', async () => {
-    const res = await server('postgres://nobody:wrong@127.0.0.1:1/none').inject({
-      method: 'GET',
-      url: '/health',
-    });
+    const h = await harness();
+    const badDb = createDb('postgres://nobody:wrong@127.0.0.1:1/none');
+    const app = await buildServer({ ...h.deps, db: badDb });
+    const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ status: 'degraded', db: 'unavailable' });
+    await app.close();
+    await badDb.destroy();
   });
 
-  it('returns a generic 404 shape for unknown routes', async () => {
-    const res = await server(url).inject({ method: 'GET', url: '/nope' });
+  it('returns 404 for unknown routes', async () => {
+    const res = await (await harness()).app.inject({ method: 'GET', url: '/nope' });
     expect(res.statusCode).toBe(404);
   });
 });
 
 describe('request logging', () => {
   it('records method, url and status but no headers', async () => {
-    const { Writable } = await import('node:stream');
     const lines: string[] = [];
     const sink = new Writable({
       write(chunk, _enc, cb) {
@@ -53,10 +50,8 @@ describe('request logging', () => {
         cb();
       },
     });
-    const db = createDb(url!) as unknown as Kysely<unknown>;
-    dbs.push(db);
-    const app = buildServer({ db, logger: createLogger({ level: 'info' }, sink) });
-    await app.inject({
+    const h = await harness({ logger: createLogger({ level: 'info' }, sink) });
+    await h.app.inject({
       method: 'GET',
       url: '/health',
       headers: { cookie: 'sid=secret-cookie', authorization: 'Bearer secret-token' },

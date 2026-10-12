@@ -8,6 +8,9 @@
     "start": "tsx src/main.ts"
   },
   "dependencies": {
+    "@pplpoll/api": "workspace:*",
+    "@pplpoll/db": "workspace:*",
+    "kysely": "^0.29.6",
     "pg-boss": "^12.37.1"
   }
 }

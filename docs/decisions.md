@@ -29,6 +29,9 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 | **Q4** | **1v1 Versus: public, private, or both? Do manual pauses apply?** Proposed: Versus has public queue + friend challenge; manual pauses only in the friend/private variant (same as other modes).                                                                                                                                                                                                                                                                                                                                                                               | Matchmaking + pause guards.                                                                          | M5                       |
 | **Q5** | **Who may spectate public matches?** Spec: host controls private spectating; "other access must respect mode/privacy". Proposed: friends of a participant (subject to blocks and online-visibility).                                                                                                                                                                                                                                                                                                                                                                          | Spectator auth rules.                                                                                | M5                       |
 
+| **Q6** | **Display names: ASCII letters only, or any language's letters?** Spec says "letters/numbers/spaces". M1 allows A–Z, a–z, 0–9 and spaces only (safest against look-alike characters). Widening later is easy. | Display-name validation | M1 (non-blocking) |
+| **Q7** | **Can a frozen account still sign in?** Spec says frozen hides the account's content from others; it doesn't say if the person can still use the site. M1 lets them sign in (content stays hidden); banned accounts cannot sign in. | Sign-in rules | M6 (non-blocking) |
+
 ### 1.3 Legal / privacy review dependencies (cannot be resolved by engineering)
 
 - **L1 — Lifetime one-answer-per-poll across deletion (§1, §10, §23.7).** Proposed mechanism: a keyed HMAC of the normalized verified email (`participation_identity`), stored separately from the account and retained after deletion. A person with a _new_ email cannot be reliably linked without stronger identity proof; spec forbids IP/device alone as proof. Needs legal review of lawful basis and retention.
@@ -46,6 +49,18 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - Leaderboard weeks: Monday 00:00 ET; months: calendar month ET.
 - Cross-midnight first guess with no new-day allowance: guess is rejected (not stored), participation is ended as `released_no_charge` with a clear message; in multiplayer this is treated as a voluntary-style exit **without** forfeit penalty, triggering the normal Vote-to-Continue path for others.
 - HEIC/HEIF decoding needs libheif; the image worker image ships its own libvips/libheif build, isolated in a sandboxed worker with CPU/memory/time caps.
+
+### 1.5 Milestone 1 engineering choices
+
+- Email must be verified before first sign-in. Invite is consumed when the account is created (before verification).
+- Passwords: 10–128 characters, Argon2id. Sessions: HttpOnly SameSite=Lax cookie, 30-day sliding expiry, CSRF token header on every state change.
+- Emails, invite codes and email payloads are AES-256-GCM encrypted at rest; lookups use keyed HMACs. Invite codes stay copyable by the Owner (spec: "copy, revoke, monitor").
+- Deactivation revokes every session, so token refresh or passive visits can never reactivate; only `POST /auth/login` does.
+- Deletion deadline = 12:00 AM ET on the day after the one-year anniversary (never less than a year); warning exactly 30 calendar days earlier. Feb 29 anniversaries fall on Mar 1.
+- Final deletion removes credentials, profile, sessions and tokens; keeps the username reservation, the participation-uniqueness record and audit history (legal review L1/L2).
+- The Owner account cannot deactivate itself (would leave nobody able to promote or issue invites).
+- Display-name removal counts as a change for the 168-hour timer. Staff-required corrections (exempt from the timer) arrive with moderation in M6.
+- Brute-force protection: per-client rate limits on invite check, register, verify, login. Per-account lockout to be added with M7 security review.
 
 ## 2. Architecture decision records
 
