@@ -231,16 +231,11 @@ describe('staff review', () => {
     expect(kinds.sort()).toEqual([false, true]);
   });
 
-  it('request revision refunds and passes the note to the creator', async () => {
+  it('there is no "send back for changes" option: staff fix wording themselves', async () => {
     const u = await member(1);
     const p = (await submit(u, uniqueText())).json();
-    const r = await decide(mod, p.proposalId, {
-      action: 'request_revision',
-      note: 'Please make it less specific',
-    });
-    expect(r.json()).toMatchObject({ status: 'revision_requested', refunded: true });
-    const note = (await notifications(u)).find((x) => x.kind === 'proposal_revision_requested');
-    expect(note?.payload.note).toBe('Please make it less specific');
+    const r = await decide(mod, p.proposalId, { action: 'request_revision', note: 'fix it' });
+    expect(r.statusCode).toBe(400);
   });
 
   it('only Super Moderators and above can correct refunds', async () => {

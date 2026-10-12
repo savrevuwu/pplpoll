@@ -51,7 +51,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       exact_key text NOT NULL,
       visibility text NOT NULL CHECK (visibility IN ('public','anonymous')),
       status text NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending','approved','rejected','revision_requested')),
+        CHECK (status IN ('pending','approved','rejected')),
       route text NOT NULL CHECK (route IN ('normal','sensitive','similarity')),
       idempotency_key text NOT NULL,
       similar_to jsonb NOT NULL DEFAULT '[]'::jsonb,

@@ -12,7 +12,7 @@ export type Role = 'member' | 'trainee' | 'moderator' | 'super_moderator' | 'adm
 export type AccountState = 'active' | 'frozen' | 'banned' | 'deactivated' | 'deleted';
 
 export type PpKind = 'daily_award' | 'proposal_debit' | 'proposal_refund' | 'refund_reversal';
-export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'revision_requested';
+export type ProposalStatus = 'pending' | 'approved' | 'rejected';
 export type ProposalRoute = 'normal' | 'sensitive' | 'similarity';
 export type Visibility = 'public' | 'anonymous';
 export type PollStatus = 'queued' | 'live_daily' | 'survey' | 'removed';

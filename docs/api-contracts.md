@@ -27,7 +27,7 @@ Conventions: JSON over HTTPS; session cookie + `X-CSRF-Token` on mutations; `Ide
 | GET/POST   | `/me/notifications`, `/me/notifications/{id}/read` | member           |                                                                                                                   |
 | GET        | `/daily/poll`                                      | member           | today's Daily Poll or `available:false`                                                                           |
 | GET        | `/staff/proposals?route=`                          | moderator+       | pending queue (normal/sensitive/similarity), shows creator                                                        |
-| POST       | `/staff/proposals/{id}/decision`                   | moderator+       | approve (optional wording fix) / reject(reason) / request_revision(note)                                          |
+| POST       | `/staff/proposals/{id}/decision`                   | moderator+       | approve (staff fix wording if needed) / reject(reason); never sent back to the submitter                          |
 | POST       | `/staff/proposals/{id}/route`                      | moderator+       | move between queues                                                                                               |
 | POST       | `/staff/proposals/{id}/refund-correction`          | super_moderator+ | grant / reverse                                                                                                   |
 | PATCH      | `/staff/polls/{id}`                                | moderator+       | wording, queued polls only                                                                                        |

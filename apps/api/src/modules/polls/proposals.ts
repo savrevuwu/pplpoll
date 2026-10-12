@@ -145,7 +145,6 @@ export async function submitProposal(
         await closeProposal(trx, {
           proposalId: proposal.id,
           creatorId: userId,
-          status: 'rejected',
           reason: 'duplicate_exact',
           actor: null,
           at: now,
@@ -174,7 +173,6 @@ async function closeProposal(
   c: {
     proposalId: string;
     creatorId: string;
-    status: 'rejected' | 'revision_requested';
     reason: RejectionReason;
     note?: string;
     actor: string | null;
@@ -185,7 +183,7 @@ async function closeProposal(
   await trx
     .updateTable('poll_proposals')
     .set({
-      status: c.status,
+      status: 'rejected',
       decision_reason: c.reason,
       refunded: refund,
       decided_by: c.actor,
@@ -203,14 +201,14 @@ async function closeProposal(
     });
   await audit(trx, {
     actor: c.actor,
-    action: c.status === 'rejected' ? 'proposal.reject' : 'proposal.request_revision',
+    action: 'proposal.reject',
     targetType: 'proposal',
     targetId: c.proposalId,
     detail: { reason: c.reason, refunded: refund, note: c.note ?? null },
   });
   await notify(trx, {
     userId: c.creatorId,
-    kind: c.status === 'rejected' ? 'proposal_rejected' : 'proposal_revision_requested',
+    kind: 'proposal_rejected',
     payload: {
       proposalId: c.proposalId,
       reason: c.reason,
@@ -224,10 +222,12 @@ async function closeProposal(
 
 export type Decision =
   | { action: 'approve'; text?: string }
-  | { action: 'reject'; reason: RejectionReason; note?: string }
-  | { action: 'request_revision'; note: string };
+  | { action: 'reject'; reason: RejectionReason; note?: string };
 
-/** Staff review (spec §9). Wording edits happen only here, before the poll exists. */
+/**
+ * Staff review (spec §9). Staff approve (fixing the wording themselves if needed) or reject.
+ * Owner decision R1: proposals never go back to the submitter for changes.
+ */
 export async function decideProposal(
   deps: AppDeps,
   actorId: string,
@@ -288,17 +288,12 @@ export async function decideProposal(
       const refunded = await closeProposal(trx, {
         proposalId: p.id,
         creatorId: p.creator_user_id,
-        status: decision.action === 'reject' ? 'rejected' : 'revision_requested',
-        reason: decision.action === 'reject' ? decision.reason : 'revision_requested',
+        reason: decision.reason,
         ...(decision.note ? { note: decision.note } : {}),
         actor: actorId,
         at: now,
       });
-      return {
-        status:
-          decision.action === 'reject' ? ('rejected' as const) : ('revision_requested' as const),
-        refunded,
-      };
+      return { status: 'rejected' as const, refunded };
     });
   } catch (err) {
     if (isUniqueViolation(err, 'polls_exact_key_key')) throw duplicatePoll();

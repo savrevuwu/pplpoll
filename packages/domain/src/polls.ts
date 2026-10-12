@@ -76,7 +76,6 @@ export const REFUNDABLE_REASONS = [
   'duplicate_similar',
   'quality',
   'unsuitable_gameplay',
-  'revision_requested',
   'other_good_faith',
 ] as const;
 export const NON_REFUNDABLE_REASONS = ['prohibited', 'malicious', 'abusive', 'spam'] as const;

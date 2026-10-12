@@ -15,16 +15,15 @@ const questionText = z.string().max(500);
 const IdParam = z.strictObject({ id: z.uuid() });
 const DateParam = z.strictObject({ date: z.iso.date() });
 const route = z.enum(['normal', 'sensitive', 'similarity']);
-const rejectReason = z.enum([
-  ...REFUNDABLE_REASONS.filter((r) => r !== 'revision_requested'),
-  ...NON_REFUNDABLE_REASONS,
-] as unknown as [RejectionReason, ...RejectionReason[]]);
+const rejectReason = z.enum([...REFUNDABLE_REASONS, ...NON_REFUNDABLE_REASONS] as unknown as [
+  RejectionReason,
+  ...RejectionReason[],
+]);
 const note = z.string().trim().min(1).max(500);
 
 const Decision = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('approve'), text: questionText.optional() }),
   z.strictObject({ action: z.literal('reject'), reason: rejectReason, note: note.optional() }),
-  z.strictObject({ action: z.literal('request_revision'), note }),
 ]);
 
 export function registerPollRoutes(app: FastifyInstance, deps: AppDeps): void {

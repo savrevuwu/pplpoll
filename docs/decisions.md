@@ -64,7 +64,7 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 
 ### 1.6 Milestone 2 engineering choices
 
-- **"Request revision" (spec §9) is built as:** the proposal is closed, the 1 PP is refunded, and the creator gets the staff note so they can submit a new, revised proposal. This keeps "no user editing after submission". _(Owner question R1 — confirm or change.)_
+- **DECIDED (owner, 2026-10-12, R1): proposals never go back to the submitter.** Staff either approve (fixing the wording themselves when needed) or reject. There is no "request revision" action; spec §9's "request revision" is read as staff revising it themselves.
 - Exact duplicates are checked against every existing poll and every pending proposal; auto-rejected and refunded. Similar questions (pg_trgm similarity ≥ 0.6) go to the similarity queue with the matches listed for staff.
 - Sensitive-queue routing uses a short editable word list (`packages/domain/src/polls.ts`). It only picks a queue; staff decide and can move proposals.
 - Rejection reasons decide refunds server-side: good-faith (duplicate, quality, unsuitable for gameplay, other) refund; prohibited/malicious/abusive/spam do not. Super Moderators and above can correct a refund.
