@@ -72,6 +72,12 @@ const leave = (s: Session, gameId: string) =>
     headers: as(s),
     payload: { confirm: true },
   });
+/** Uses one daily game: three wrong guesses end it as a loss. */
+async function burnGame(s: Session) {
+  const g = (await start(s)).json();
+  for (const w of ['banana', 'rocket', 'umbrella']) await guess(s, g.gameId, w);
+  return g.gameId as string;
+}
 const status = async (s: Session) =>
   (await h.app.inject({ method: 'GET', url: '/games/status', headers: as(s) })).json();
 
@@ -310,7 +316,8 @@ describe('solo game (§5, §6)', () => {
     expect((await guess(u, g.gameId, 'keys')).statusCode).toBe(200);
     await guess(u, g.gameId, 'banana');
     expect((await status(u)).gamesUsed).toBe(1);
-    await leave(u, g.gameId);
+    await guess(u, g.gameId, 'rocket');
+    await guess(u, g.gameId, 'umbrella'); // 3rd strike ends it
     expect((await start(u)).json().error.code).toBe('NO_ELIGIBLE_POLL');
   });
 
@@ -347,9 +354,7 @@ describe('daily guessing allowance (§23.3, AT-12..14)', () => {
     await snapshots();
     const u = await member();
     for (let i = 0; i < 10; i++) {
-      const g = (await start(u)).json();
-      await guess(u, g.gameId, 'banana'); // charge
-      await leave(u, g.gameId);
+      await burnGame(u);
     }
     expect(await status(u)).toMatchObject({ gamesUsed: 10, gamesLeft: 0 });
     expect((await start(u)).json().error.code).toBe('DAILY_LIMIT_REACHED');
@@ -364,9 +369,7 @@ describe('daily guessing allowance (§23.3, AT-12..14)', () => {
     await snapshots();
     const u = await member();
     for (let i = 0; i < 9; i++) {
-      const g = (await start(u)).json();
-      await guess(u, g.gameId, 'banana');
-      await leave(u, g.gameId);
+      await burnGame(u);
     }
     const last = (await start(u)).json();
     await guess(u, last.gameId, 'keys'); // 10th charge
@@ -508,16 +511,47 @@ describe('Rarest Correct Guess (update §8, §9)', () => {
     expect(as2).toMatchObject({ rarestCorrectGuess: '4.00%', rarestGuessRecordHolder: false });
   });
 
-  it('abandoned games do not count toward the rarest guess', async () => {
+  it('after guessing, a solo game cannot be left: it is saved and resumes later, even the next day (S1)', async () => {
+    await pollWithAnswers(PURSE);
     await pollWithAnswers(PURSE);
     await snapshots();
     const u = await member();
     const g = (await start(u)).json();
     await guess(u, g.gameId, 'mints');
-    await leave(u, g.gameId);
+    const left = await leave(u, g.gameId);
+    expect(left.statusCode).toBe(409);
+    expect(left.json().error).toMatchObject({ code: 'GAME_IN_PROGRESS', gameId: g.gameId });
+    const other = await start(u);
+    expect(other.json().error).toMatchObject({ code: 'ACTIVE_GAME_EXISTS', gameId: g.gameId });
+    expect((await status(u)).activeGameId).toBe(g.gameId);
     expect(
       (await h.app.inject({ method: 'GET', url: '/me/stats', headers: as(u) })).json()
         .rarestCorrectGuess,
     ).toBeNull();
+
+    h.clock.set('2026-10-14T16:00:00Z'); // two days later
+    const fresh = await login(h, u.email, u.password);
+    const resumed = (
+      await h.app.inject({ method: 'GET', url: `/games/${g.gameId}`, headers: as(fresh) })
+    ).json();
+    expect(resumed).toMatchObject({
+      state: 'active',
+      found: [{ answer: 'Mints', percent: '4.00%' }],
+    });
+    await guess(fresh, g.gameId, 'keys');
+    expect((await guess(fresh, g.gameId, 'wallet')).json().game.outcome).toBe('won');
+    expect(
+      (await h.app.inject({ method: 'GET', url: '/me/stats', headers: as(fresh) })).json(),
+    ).toMatchObject({
+      solo: { wins: 1 },
+      rarestCorrectGuess: '4.00%',
+    });
+    // Charged once, on the day of the first guess.
+    const charges = await h.db
+      .selectFrom('daily_charges')
+      .selectAll()
+      .where('user_id', '=', u.userId)
+      .execute();
+    expect(charges.map((c) => [c.et_date, c.charged])).toEqual([['2026-10-12', 1]]);
   });
 });

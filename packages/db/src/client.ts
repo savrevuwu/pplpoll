@@ -284,7 +284,7 @@ export interface Database {
     snapshot_id: string;
     user_id: string;
     state: ColumnType<'active' | 'ended', 'active' | 'ended' | undefined, 'active' | 'ended'>;
-    outcome: 'won' | 'lost' | 'abandoned' | 'released' | null;
+    outcome: 'won' | 'lost' | 'released' | null;
     score_count: Generated<number>;
     score_total: number;
     strikes: Generated<number>;

@@ -62,7 +62,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       snapshot_id uuid NOT NULL REFERENCES result_snapshots(id),
       user_id uuid NOT NULL REFERENCES users(id),
       state text NOT NULL DEFAULT 'active' CHECK (state IN ('active','ended')),
-      outcome text CHECK (outcome IN ('won','lost','abandoned','released')),
+      outcome text CHECK (outcome IN ('won','lost','released')),
       score_count integer NOT NULL DEFAULT 0,
       score_total integer NOT NULL,
       strikes integer NOT NULL DEFAULT 0 CHECK (strikes BETWEEN 0 AND 3),

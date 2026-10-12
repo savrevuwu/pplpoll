@@ -95,7 +95,7 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - **Guess matching:** exact key, plural variant, or one typo/adjacent swap for 5+ letter words — only when exactly one answer group is that close.
 - **Snapshots:** one immutable snapshot per poll per ET day (job runs every 10 minutes, idempotent). A game keeps the snapshot it started with. Eligible = 100+ respondents and K ≤ 17.
 - **Allowance:** starting reserves (no charge); the first accepted guess charges the ET date of that guess. If that day is already full (only possible across midnight), the guess is refused and the game is released with no charge and the poll is not marked played. Leaving before any accepted guess releases the reservation.
-- **Solo outcome:** reaching 60% wins; 3rd strike or using all guesses loses. Leaving after a guess is recorded as "abandoned" (charge kept, poll stays played) and is **not** counted as a completed game for stats or Rarest Correct Guess. _(Owner question S1: should abandoning count as a loss on leaderboards?)_
+- **Solo outcome:** reaching 60% wins; 3rd strike or using all guesses loses. **DECIDED (owner, S1):** a solo game can't be abandoned after the first accepted guess — it stays saved and the player resumes it later (any day). Leaving is only possible before the first guess, which releases it with no charge. While a game is saved, it is the person's one active game.
 - **Rarest Correct Guess:** lowest frozen share among correct guesses from won/lost (completed, valid) games; sitewide badge = everyone tied at the lowest share. Only percentages are shown, never the poll or answer.
 - Guess submissions share the per-person 60/min limit; guesses are stored with an identity sequence so same-millisecond guesses replay in exact order.
 

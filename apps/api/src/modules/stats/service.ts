@@ -64,7 +64,6 @@ export async function playerStats(db: Kysely<Database>, userId: string) {
       gamesPlayed: count('won') + count('lost'),
       wins: count('won'),
       losses: count('lost'),
-      abandoned: count('abandoned'),
       correctGuesses: Number(accuracy.correct),
       acceptedGuesses: Number(accuracy.accepted),
     },

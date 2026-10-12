@@ -265,7 +265,7 @@ async function endParticipation(
   trx: Trx,
   gameId: string,
   userId: string,
-  outcome: 'won' | 'lost' | 'abandoned' | 'released',
+  outcome: 'won' | 'lost' | 'released',
   now: Date,
 ) {
   await trx
@@ -465,7 +465,11 @@ function toView(
   };
 }
 
-/** Leaving: no accepted guess -> the reservation is released with no charge; otherwise the charge stays. */
+/**
+ * Leaving is only possible before the first accepted guess: the reservation is released with no
+ * charge. After that a solo game can't be abandoned — the player comes back to it later and picks
+ * up where they left off (owner decision S1).
+ */
 export async function leaveGame(deps: AppDeps, userId: string, gameId: string) {
   const now = deps.clock();
   await deps.db.transaction().execute(async (trx) => {
@@ -477,13 +481,15 @@ export async function leaveGame(deps: AppDeps, userId: string, gameId: string) {
       .where('game_id', '=', gameId)
       .where('user_id', '=', userId)
       .executeTakeFirstOrThrow();
-    await endParticipation(
-      trx,
-      gameId,
-      userId,
-      part.first_guess_at ? 'abandoned' : 'released',
-      now,
-    );
+    if (part.first_guess_at) {
+      throw new AppError(
+        409,
+        'GAME_IN_PROGRESS',
+        'This game is saved. Come back any time to finish it',
+        { gameId },
+      );
+    }
+    await endParticipation(trx, gameId, userId, 'released', now);
   });
   return getGame(deps, userId, gameId);
 }
