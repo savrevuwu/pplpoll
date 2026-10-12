@@ -82,6 +82,10 @@ export class GuessBoard {
   score(): Share {
     return share(this.scoreCount, this.cfg.respondents);
   }
+  /** Answer groups this side has found. */
+  foundGroups(): ReadonlySet<string> {
+    return new Set([...this.seen].filter((k) => k.startsWith('g:')).map((k) => k.slice(2)));
+  }
   /** Per-teammate credit for unique correct answers. */
   contributions(): ReadonlyMap<string, Contribution> {
     return this.credit;

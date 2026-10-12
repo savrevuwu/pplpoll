@@ -73,10 +73,10 @@ Engineering decisions (no owner input needed):
 | Batch | Contents                                                                                                                                | Needs             | Status                |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------- |
 | **A** | Pure scoring logic in `packages/domain`: exact shares, K/cap, guess board, ranking/tiebreakers, placements, series tally, rarest record | nothing           | **Done (this batch)** |
-| M2    | Poll proposals, staff review, Daily Poll queue and midnight publish                                                                     | —                 | Next                  |
-| M3    | Survey answers, 11 daily responses, PP                                                                                                  | M2                | Pending               |
-| M4    | Snapshots, eligibility, solo game, daily charges, played state, results ledger + Rarest Correct Guess                                   | M3, G1            | Pending               |
-| M4b   | Mystery Challenge                                                                                                                       | M4, G2, G3        | Pending               |
+| M2    | Poll proposals, staff review, Daily Poll queue and midnight publish                                                                     | —                 | **Done**              |
+| M3    | Survey answers, 11 daily responses, PP                                                                                                  | M2                | **Done**              |
+| M4    | Snapshots, eligibility, solo game, daily charges, played state, results ledger + Rarest Correct Guess                                   | M3, G1            | **Done**              |
+| M4b   | Mystery Challenge                                                                                                                       | M4, G2, G3        | **Done**              |
 | M5a   | Match engine: H2H / Teams / FFA × Classic / Speed, clocks, turns, WebSocket feeds                                                       | M4, G4–G7, Q3, Q5 | Pending               |
 | M5b   | Best-of-3/5 series                                                                                                                      | M5a, G8           | Pending               |
 | M5c   | Pauses, disconnects, Vote to Continue, outages for all modes                                                                            | M5a, G6           | Pending               |

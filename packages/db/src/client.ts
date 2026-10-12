@@ -279,7 +279,8 @@ export interface Database {
   };
   games: {
     id: Generated<string>;
-    mode: 'solo';
+    mode: 'solo' | 'mystery';
+    objective: ColumnType<unknown, string | null | undefined, string | null>;
     poll_id: string;
     snapshot_id: string;
     user_id: string;

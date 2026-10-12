@@ -8,9 +8,13 @@ import {
   isRarer,
   matchGuess,
   MAX_STRIKES,
+  achievableObjectives,
+  describeObjective,
+  objectiveStatus,
   replayEligible,
   share,
   TARGET_PERCENT,
+  type Objective,
   type Share,
 } from '@pplpoll/domain';
 import { sql, type Transaction } from 'kysely';
@@ -55,6 +59,7 @@ type SnapshotRow = {
   eligible?: boolean;
   poll_id: string;
   respondents: number;
+  k: number | null;
   guess_cap: number | null;
   distribution: Record<string, number>;
   keymap: Record<string, string>;
@@ -68,7 +73,7 @@ type SnapshotRow = {
  */
 async function pickPoll(trx: Trx, userId: string, now: Date): Promise<SnapshotRow | null> {
   const latest = await sql<SnapshotRow>`
-    SELECT DISTINCT ON (s.poll_id) s.id, s.poll_id, s.respondents, s.guess_cap, s.distribution, s.keymap, s.labels, s.eligible
+    SELECT DISTINCT ON (s.poll_id) s.id, s.poll_id, s.respondents, s.k, s.guess_cap, s.distribution, s.keymap, s.labels, s.eligible
     FROM result_snapshots s JOIN polls p ON p.id = s.poll_id
     WHERE p.status = 'survey'
     ORDER BY s.poll_id, s.version DESC
@@ -96,7 +101,24 @@ async function pickPoll(trx: Trx, userId: string, now: Date): Promise<SnapshotRo
   return open[Math.floor(Math.random() * open.length)]!;
 }
 
-export async function startSolo(deps: AppDeps, userId: string) {
+export type SoloMode = 'solo' | 'mystery';
+
+export const startSolo = (deps: AppDeps, userId: string) => startGame(deps, userId, 'solo');
+
+/** Mystery Challenge (update §6): a random unplayed poll with one achievable special objective. */
+export const startMystery = (deps: AppDeps, userId: string) => startGame(deps, userId, 'mystery');
+
+function pickObjective(snap: SnapshotRow): Objective {
+  const options = achievableObjectives({
+    respondents: snap.respondents,
+    distribution: snap.distribution,
+    k: snap.k!,
+    guessCap: snap.guess_cap!,
+  });
+  return options[Math.floor(Math.random() * options.length)]!;
+}
+
+async function startGame(deps: AppDeps, userId: string, mode: SoloMode) {
   const now = deps.clock();
   const date = etDate(now);
   try {
@@ -118,7 +140,8 @@ export async function startSolo(deps: AppDeps, userId: string) {
       const game = await trx
         .insertInto('games')
         .values({
-          mode: 'solo',
+          mode,
+          objective: mode === 'mystery' ? JSON.stringify(pickObjective(snap)) : null,
           poll_id: snap.poll_id,
           snapshot_id: snap.id,
           user_id: userId,
@@ -167,12 +190,13 @@ async function loadGame(trx: Trx, userId: string, gameId: string, lock: boolean)
   return g;
 }
 
-async function rebuildBoard(trx: Trx, gameId: string, snap: SnapshotRow) {
+async function rebuildBoard(trx: Trx, gameId: string, snap: SnapshotRow, mode: SoloMode) {
   const board = new GuessBoard({
     distribution: new Map(Object.entries(snap.distribution)),
     respondents: snap.respondents,
     guessCap: snap.guess_cap!,
-    stopAtTarget: true,
+    // Solo stops at 60%; a Mystery Challenge ends on its own objective instead.
+    stopAtTarget: mode === 'solo',
   });
   const prior = await trx
     .selectFrom('guesses')
@@ -193,7 +217,7 @@ async function rebuildBoard(trx: Trx, gameId: string, snap: SnapshotRow) {
 async function snapshotOf(trx: Trx, id: string): Promise<SnapshotRow> {
   return trx
     .selectFrom('result_snapshots')
-    .select(['id', 'poll_id', 'respondents', 'guess_cap', 'distribution', 'keymap', 'labels'])
+    .select(['id', 'poll_id', 'respondents', 'k', 'guess_cap', 'distribution', 'keymap', 'labels'])
     .where('id', '=', id)
     .executeTakeFirstOrThrow();
 }
@@ -367,7 +391,7 @@ export async function submitGuess(
         if (prior) return { released: false, view: toView(prior.result, prior.group_id, snap) };
         if (game.state !== 'active') throw new AppError(409, 'GAME_OVER', 'This game has ended');
 
-        const board = await rebuildBoard(trx, gameId, snap);
+        const board = await rebuildBoard(trx, gameId, snap, game.mode);
         const match = matchGuess(clean, snap.keymap);
         const r = board.submit({
           groupId: match.groupId,
@@ -424,20 +448,15 @@ export async function submitGuess(
             })
             .where('id', '=', gameId)
             .execute();
-          if (board.finished) {
-            await endParticipation(
-              trx,
-              gameId,
-              userId,
-              board.finishedReason === 'target' ? 'won' : 'lost',
-              now,
-            );
+          const result = gameResult(game.mode, game.objective as Objective | null, board);
+          if (result) {
+            await endParticipation(trx, gameId, userId, result, now);
             await audit(trx, {
               actor: userId,
               action: 'game.end',
               targetType: 'game',
               targetId: gameId,
-              detail: { outcome: board.finishedReason },
+              detail: { outcome: result, mode: game.mode },
             });
           }
         }
@@ -449,6 +468,25 @@ export async function submitGuess(
     );
   if (outcome.released) throw dailyLimit();
   return { ...outcome.view, game: await getGame(deps, userId, gameId) };
+}
+
+/** Solo: 60% wins, strikes/cap lose. Mystery: the objective decides; strikes/cap still end it. */
+function gameResult(
+  mode: SoloMode,
+  objective: Objective | null,
+  board: GuessBoard,
+): 'won' | 'lost' | null {
+  if (mode === 'solo')
+    return board.finished ? (board.finishedReason === 'target' ? 'won' : 'lost') : null;
+  const status = objectiveStatus(objective!, {
+    found: board.foundGroups(),
+    score: board.score(),
+    strikes: board.strikes,
+    accepted: board.accepted,
+  });
+  if (status === 'completed') return 'won';
+  if (status === 'failed' || board.finished) return 'lost';
+  return null;
 }
 
 function toView(
@@ -490,7 +528,13 @@ export async function getGame(deps: AppDeps, userId: string, gameId: string) {
       question: poll.text,
       state: game.state,
       outcome: game.outcome,
-      targetPercent: TARGET_PERCENT,
+      targetPercent: game.mode === 'solo' ? TARGET_PERCENT : null,
+      objective: game.objective
+        ? {
+            type: (game.objective as Objective).type,
+            description: describeObjective(game.objective as Objective),
+          }
+        : null,
       score: formatPercent(share(game.score_count, game.score_total)),
       strikes: game.strikes,
       maxStrikes: MAX_STRIKES,

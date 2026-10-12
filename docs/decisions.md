@@ -99,6 +99,13 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - **Rarest Correct Guess:** lowest frozen share among correct guesses from won/lost (completed, valid) games; sitewide badge = everyone tied at the lowest share. Only percentages are shown, never the poll or answer.
 - Guess submissions share the per-person 60/min limit; guesses are stored with an identity sequence so same-millisecond guesses replay in exact order.
 
+### 1.9 Mystery Challenge (M4b) engineering choices
+
+- Five objectives (owner-approved G3): Top Answer (find #1; a tie for #1 accepts either), Top Three (only offered when 3rd place isn't tied with 4th), Deep Cut (an answer under 5%), Clean Sweep (60% with no wrong guess), Efficient (60% within K+1 guesses). One is picked at random from those achievable on the poll's frozen results.
+- The objective replaces the 60% goal: the challenge ends as soon as it is completed, or fails as soon as it can no longer be met (Clean Sweep after a strike, Efficient after its budget), or when 3 strikes / the guess cap end it.
+- Counts toward the shared 10 daily games (G2) and the one-active-game rule, marks the poll played, has no leave option (same as solo, S1), never touches Poll Points or daily surveys.
+- Stats: attempts (finished challenges), completions, failures, and per-objective fewest-guess personal bests. Correct guesses in finished challenges count toward Rarest Correct Guess. Not on the solo leaderboard (G11).
+
 ## 2. Architecture decision records
 
 | ADR     | Decision                                                                                                        | Status   |

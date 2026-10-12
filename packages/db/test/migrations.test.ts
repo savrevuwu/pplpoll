@@ -17,7 +17,10 @@ async function auditTableExists(): Promise<boolean> {
 
 beforeAll(async () => {
   db = createDb(url) as unknown as Kysely<unknown>;
-  await migrateDownAll(db);
+  // Start from an empty database: other test files may have left game data behind.
+  await sql`DROP SCHEMA IF EXISTS audit CASCADE`.execute(db);
+  await sql`DROP SCHEMA public CASCADE`.execute(db);
+  await sql`CREATE SCHEMA public`.execute(db);
 });
 
 afterAll(async () => {

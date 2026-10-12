@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { createDb, migrateDownAll, migrateToLatest, type Database } from '@pplpoll/db';
+import { createDb, migrateToLatest, type Database } from '@pplpoll/db';
+import { sql } from 'kysely';
 import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import type { Kysely } from 'kysely';
 import { Crypto } from '../../src/core/crypto.js';
@@ -13,6 +14,13 @@ export const TEST_URL = process.env.TEST_DATABASE_URL ?? '';
 if (!TEST_URL) throw new Error('TEST_DATABASE_URL is required for integration tests');
 
 /** Controllable clock so time-based rules can be tested exactly. */
+/** Wipes the test database completely (rollback paths are tested separately on an empty DB). */
+async function resetTestDatabase(db: Kysely<Database>) {
+  await sql`DROP SCHEMA IF EXISTS audit CASCADE`.execute(db);
+  await sql`DROP SCHEMA public CASCADE`.execute(db);
+  await sql`CREATE SCHEMA public`.execute(db);
+}
+
 export class TestClock {
   constructor(public now = new Date('2026-10-12T16:00:00Z')) {}
   readonly fn = () => new Date(this.now);
@@ -36,7 +44,7 @@ export async function createHarness(
   opts: { rateLimitMax?: number; answerRateLimitMax?: number; logger?: AppDeps['logger'] } = {},
 ): Promise<Harness> {
   const db = createDb(TEST_URL);
-  await migrateDownAll(db as unknown as Kysely<unknown>);
+  await resetTestDatabase(db);
   await migrateToLatest(db as unknown as Kysely<unknown>);
   const clock = new TestClock();
   const deps: AppDeps = {

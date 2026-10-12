@@ -53,6 +53,34 @@ export async function playerStats(db: Kysely<Database>, userId: string) {
     .where('gm.valid', '=', true)
     .where('gm.outcome', 'in', ['won', 'lost'])
     .executeTakeFirstOrThrow();
+  // Mystery Challenge (update §6): attempts, completions, failures, personal bests per objective.
+  const mysteryRows = await db
+    .selectFrom('games')
+    .select(['objective', 'outcome', 'accepted'])
+    .where('user_id', '=', userId)
+    .where('mode', '=', 'mystery')
+    .where('valid', '=', true)
+    .where('outcome', 'in', ['won', 'lost'])
+    .execute();
+  const byObjective: Record<
+    string,
+    { completions: number; failures: number; fewestGuesses: number | null }
+  > = {};
+  for (const r of mysteryRows) {
+    const type = (r.objective as { type: string }).type;
+    const o = (byObjective[type] ??= { completions: 0, failures: 0, fewestGuesses: null });
+    if (r.outcome === 'won') {
+      o.completions++;
+      o.fewestGuesses =
+        o.fewestGuesses === null ? r.accepted : Math.min(o.fewestGuesses, r.accepted);
+    } else o.failures++;
+  }
+  const mystery = {
+    attempts: mysteryRows.length,
+    completions: mysteryRows.filter((r) => r.outcome === 'won').length,
+    failures: mysteryRows.filter((r) => r.outcome === 'lost').length,
+    byObjective,
+  };
   const rarest = await db
     .selectFrom('player_rarest')
     .select(['share_count', 'share_total'])
@@ -67,6 +95,7 @@ export async function playerStats(db: Kysely<Database>, userId: string) {
       correctGuesses: Number(accuracy.correct),
       acceptedGuesses: Number(accuracy.accepted),
     },
+    mystery,
     rarestCorrectGuess: rarest
       ? formatPercent(share(rarest.share_count, rarest.share_total))
       : null,

@@ -25,6 +25,10 @@ export function registerGameRoutes(app: FastifyInstance, deps: AppDeps): void {
 
   app.get('/games/status', user, async (req) => solo.guessingStatus(deps, currentUser(req).userId));
 
+  app.post('/games/mystery', user, async (req, reply) =>
+    reply.code(201).send(await solo.startMystery(deps, currentUser(req).userId)),
+  );
+
   app.post('/games/solo', user, async (req, reply) =>
     reply.code(201).send(await solo.startSolo(deps, currentUser(req).userId)),
   );
