@@ -6,6 +6,8 @@ import {
   loadSecrets,
   publishDaily,
   computeSnapshots,
+  finishExpiredMatches,
+  MatchEvents,
   runFinalDeletions,
   sendDeactivationWarnings,
   type EmailTransport,
@@ -67,6 +69,24 @@ await boss.schedule('snapshots.compute', '*/10 * * * *');
 await boss.work('snapshots.compute', async () => {
   const made = await computeSnapshots({ db }, new Date());
   if (made) logger.info({ made }, 'result snapshots computed');
+});
+
+// Backup for the API's 1-second match ticker: ends any match whose clock ran out.
+const matchDeps = {
+  db,
+  logger,
+  crypto,
+  clock: () => new Date(),
+  secureCookies: true,
+  authRateLimit: { max: 10, timeWindowMs: 60_000 },
+  answerRateLimit: { max: 60, timeWindowMs: 60_000 },
+  events: new MatchEvents(),
+};
+await boss.createQueue('matches.finish_expired');
+await boss.schedule('matches.finish_expired', every);
+await boss.work('matches.finish_expired', async () => {
+  const n = await finishExpiredMatches(matchDeps, new Date());
+  if (n) logger.info({ n }, 'expired matches finished');
 });
 
 logger.info('worker started');

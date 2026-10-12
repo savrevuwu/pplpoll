@@ -7,3 +7,4 @@ export * from './rarest.js';
 export * from './grouping.js';
 export * from './replay.js';
 export * from './objectives.js';
+export * from './match.js';

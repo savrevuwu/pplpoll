@@ -164,7 +164,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       user_id uuid PRIMARY KEY REFERENCES users(id),
       share_count integer NOT NULL CHECK (share_count > 0),
       share_total integer NOT NULL CHECK (share_total >= share_count),
-      guess_id uuid NOT NULL REFERENCES guesses(id),
+      guess_id uuid NOT NULL,
+      guess_source text NOT NULL DEFAULT 'game' CHECK (guess_source IN ('game','match')),
       achieved_at timestamptz NOT NULL
     )
   `.execute(db);

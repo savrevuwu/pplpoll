@@ -12,6 +12,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.1.3",
     "@fastify/rate-limit": "^11.2.1",
+    "@fastify/websocket": "^11.3.4",
     "@node-rs/argon2": "^2.2.2",
     "@pplpoll/db": "workspace:*",
     "@pplpoll/domain": "workspace:*",
@@ -22,5 +23,9 @@
   },
   "exports": {
     ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2",
+    "ws": "^8.22.0"
   }
 }

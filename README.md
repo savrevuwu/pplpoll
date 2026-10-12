@@ -2,7 +2,7 @@
 
 Survey collection + popular-answer guessing game platform.
 
-> **Status:** Milestone 0 done. Milestones 1 (accounts), 2 (poll proposals, Daily Poll), 3 (survey answering, daily Poll Point) and 4 (snapshots, solo guessing, daily game limit, Rarest Correct Guess, Mystery Challenge) implemented and tested. Multiplayer not yet.
+> **Status:** Milestone 0 done. Milestones 1 (accounts), 2 (poll proposals, Daily Poll), 3 (survey answering, daily Poll Point) and 4 (snapshots, solo guessing, daily game limit, Rarest Correct Guess, Mystery Challenge) implemented and tested. Multiplayer M5a (Head-to-Head / Teams / Free-for-All × Classic / Speed, rooms, matchmaking, live updates) implemented; series, pauses/disconnects, tournaments next.
 > Approved product spec: [`docs/spec/The_People_Poll_Master_Specification_v2.md`](docs/spec/The_People_Poll_Master_Specification_v2.md).
 
 ## Quick start

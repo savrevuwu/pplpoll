@@ -106,6 +106,17 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - Counts toward the shared 10 daily games (G2) and the one-active-game rule, marks the poll played, has no leave option (same as solo, S1), never touches Poll Points or daily surveys.
 - Stats: attempts (finished challenges), completions, failures, and per-objective fewest-guess personal bests. Correct guesses in finished challenges count toward Rarest Correct Guess. Not on the solo leaderboard (G11).
 
+### 1.10 Multiplayer batch M5a engineering choices
+
+- **Modes/formats:** Head-to-Head (2), Teams (exactly 4, 2 v 2), Free-for-All (3–6) × Classic (120 s, alternating turns) / Speed (60 s, simultaneous). Clocks and turns are server-authoritative and applied deterministically on every request plus a 1-second ticker (API) and a 1-minute backup job (worker).
+- **Classic turns (G5):** 15 s per turn; a timeout passes the turn with no strike. An accepted guess passes the turn; an "Already guessed" repeat does not. Turn order is random. In Teams the submitting teammate rotates after each accepted guess and also when the team's turn times out (so one teammate can't stall the team).
+- **Scoring (G4):** reaching 60% does not stop a side; play continues until the clock ends or every side is finished (3 strikes or guess cap). Ranking uses the owner's tiebreakers on exact stored values; genuine ties are kept (G7: 1/1/3 numbering; lone 1st wins, shared 1st draws, others lose).
+- **Teams charging:** a team's first accepted guess charges **every** teammate one daily game and marks the poll played for all of them (they share one answer pool). Players/sides that never make an accepted guess are released with no charge.
+- **Start rules:** every player needs a daily game left, no other active game, and a poll all of them may play (never played, or replay-eligible). Lobbies and the public queue don't reserve games; the reservation happens at start.
+- **Public matchmaking:** first available compatible players per mode + format (FFA starts with 3–6 as available). Public Teams currently uses random teammates; queueing with a friend arrives with the friends feature (M6). If the front of the queue has no poll in common, they stay queued.
+- **Privacy:** each viewer gets their own projection. Your own side sees its words and answers (teammates included); other sides show only numbered results, correct-guess percentages, totals, strikes and contributions. WebSocket messages carry only ids.
+- **Not in M5a (later batches):** Best-of-3/5 (M5b), pauses/disconnects/Vote to Continue/outages (M5c), tournaments (M5d), spectators and friend challenges (need friends, M6). The real-time bus is in-process; a Redis fan-out is needed before running more than one API instance.
+
 ## 2. Architecture decision records
 
 | ADR     | Decision                                                                                                        | Status   |

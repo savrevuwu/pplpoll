@@ -2,6 +2,7 @@ import type { Database } from '@pplpoll/db';
 import type { Kysely } from 'kysely';
 import type { FastifyBaseLogger } from 'fastify';
 import type { Crypto } from './crypto.js';
+import type { MatchEvents } from '../modules/matches/events.js';
 
 export type Clock = () => Date;
 
@@ -16,4 +17,6 @@ export interface AppDeps {
   authRateLimit: { max: number; timeWindowMs: number };
   /** Per-person limit on survey answer submissions. */
   answerRateLimit: { max: number; timeWindowMs: number };
+  /** Real-time match update notifications. */
+  events: MatchEvents;
 }

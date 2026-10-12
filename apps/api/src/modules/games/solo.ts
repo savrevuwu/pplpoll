@@ -1,11 +1,9 @@
 import type { Database } from '@pplpoll/db';
 import {
   cleanAnswer,
-  compareShares,
   etDate,
   formatPercent,
   GuessBoard,
-  isRarer,
   matchGuess,
   MAX_STRIKES,
   achievableObjectives,
@@ -15,17 +13,23 @@ import {
   share,
   TARGET_PERCENT,
   type Objective,
-  type Share,
 } from '@pplpoll/domain';
 import { sql, type Transaction } from 'kysely';
 import { audit } from '../../core/audit.js';
 import type { AppDeps } from '../../core/deps.js';
 import { AppError, errors, isUniqueViolation } from '../../core/errors.js';
-import { advanceStreak } from '../streaks/service.js';
+import {
+  chargedOn,
+  chargeParticipant,
+  DAILY_GAME_LIMIT,
+  endParticipationRow,
+  recordRarest,
+  reserve,
+} from '../allowance/service.js';
+
+export { DAILY_GAME_LIMIT };
 
 type Trx = Transaction<Database>;
-
-export const DAILY_GAME_LIMIT = 10;
 
 const dailyLimit = () =>
   new AppError(
@@ -39,20 +43,6 @@ const noPoll = () =>
     'NO_ELIGIBLE_POLL',
     "There's no new poll for you to play right now. Check back after more people answer.",
   );
-
-async function chargedOn(
-  trx: Trx | Pick<AppDeps, 'db'>['db'],
-  userId: string,
-  date: string,
-): Promise<number> {
-  const r = await trx
-    .selectFrom('daily_charges')
-    .select('charged')
-    .where('user_id', '=', userId)
-    .where('et_date', '=', date)
-    .executeTakeFirst();
-  return r?.charged ?? 0;
-}
 
 type SnapshotRow = {
   id: string;
@@ -157,16 +147,7 @@ async function startGame(deps: AppDeps, userId: string, mode: SoloMode) {
         .returning('id')
         .executeTakeFirstOrThrow();
       // Reserving does not charge; the first accepted guess does (§23.3).
-      await trx
-        .insertInto('allowance_events')
-        .values({
-          user_id: userId,
-          participation_id: part.id,
-          kind: 'reserve',
-          et_date: date,
-          at: now,
-        })
-        .execute();
+      await reserve(trx, userId, part.id, now);
       return game.id;
     });
     return getGame(deps, userId, gameId);
@@ -222,69 +203,6 @@ async function snapshotOf(trx: Trx, id: string): Promise<SnapshotRow> {
     .executeTakeFirstOrThrow();
 }
 
-/**
- * Charges one of today's 10 games at the first accepted guess, by the ET date of that guess,
- * even if the game started before midnight. Returns false when that day is already full.
- */
-async function chargeFirstGuess(
-  trx: Trx,
-  userId: string,
-  participationId: string,
-  pollId: string,
-  snapshotId: string,
-  now: Date,
-): Promise<boolean> {
-  const date = etDate(now);
-  const charged = await trx
-    .insertInto('daily_charges')
-    .values({ user_id: userId, et_date: date, charged: 1 })
-    .onConflict((oc) =>
-      oc
-        .columns(['user_id', 'et_date'])
-        .doUpdateSet((eb) => ({ charged: eb('daily_charges.charged', '+', 1) }))
-        .where('daily_charges.charged', '<', DAILY_GAME_LIMIT),
-    )
-    .returning('charged')
-    .executeTakeFirst();
-  if (!charged) return false;
-  await trx
-    .insertInto('allowance_events')
-    .values({
-      user_id: userId,
-      participation_id: participationId,
-      kind: 'charge',
-      et_date: date,
-      at: now,
-    })
-    .execute();
-  await trx
-    .updateTable('game_participations')
-    .set({ first_guess_at: now, charge_et_date: date })
-    .where('id', '=', participationId)
-    .execute();
-  // First accepted guess marks the poll played (§5, §23.2).
-  await trx
-    .insertInto('played_polls')
-    .values({
-      user_id: userId,
-      poll_id: pollId,
-      first_played_at: now,
-      last_played_at: now,
-      last_snapshot_id: snapshotId,
-    })
-    .onConflict((oc) =>
-      oc.columns(['user_id', 'poll_id']).doUpdateSet((eb) => ({
-        last_played_at: now,
-        last_snapshot_id: snapshotId,
-        plays: eb('played_polls.plays', '+', 1),
-      })),
-    )
-    .execute();
-  // Guessing streak advances on the day's 10th charged game (§17, §23.5).
-  if (charged.charged === DAILY_GAME_LIMIT) await advanceStreak(trx, userId, 'guessing', date);
-  return true;
-}
-
 async function endParticipation(
   trx: Trx,
   gameId: string,
@@ -298,61 +216,31 @@ async function endParticipation(
     .where('id', '=', gameId)
     .execute();
   const part = await trx
-    .updateTable('game_participations')
-    .set({ active: false, ended_at: now })
+    .selectFrom('game_participations')
+    .select('id')
     .where('game_id', '=', gameId)
     .where('user_id', '=', userId)
-    .returning(['id', 'first_guess_at'])
     .executeTakeFirstOrThrow();
-  if (!part.first_guess_at) {
-    await trx
-      .insertInto('allowance_events')
-      .values({
-        user_id: userId,
-        participation_id: part.id,
-        kind: 'release',
-        et_date: etDate(now),
-        at: now,
-      })
-      .onConflict((oc) => oc.columns(['participation_id', 'kind']).doNothing())
+  await endParticipationRow(trx, part.id, userId, now);
+  if (outcome === 'won' || outcome === 'lost') {
+    const correct = await trx
+      .selectFrom('guesses')
+      .select(['id', 'share_count', 'share_total', 'at'])
+      .where('game_id', '=', gameId)
+      .where('result', '=', 'correct')
       .execute();
+    await recordRarest(
+      trx,
+      userId,
+      correct.map((c) => ({
+        guessId: c.id,
+        count: c.share_count!,
+        total: c.share_total!,
+        at: c.at,
+      })),
+      'game',
+    );
   }
-  if (outcome === 'won' || outcome === 'lost') await updateRarest(trx, gameId, userId);
-}
-
-/** Personal Rarest Correct Guess from a valid completed game (update §8). */
-async function updateRarest(trx: Trx, gameId: string, userId: string) {
-  const correct = await trx
-    .selectFrom('guesses')
-    .select(['id', 'share_count', 'share_total', 'at'])
-    .where('game_id', '=', gameId)
-    .where('submitted_by', '=', userId)
-    .where('result', '=', 'correct')
-    .execute();
-  let best: { id: string; s: Share; at: Date } | null = null;
-  for (const c of correct) {
-    const s = share(c.share_count!, c.share_total!);
-    if (!best || compareShares(s, best.s) < 0) best = { id: c.id, s, at: c.at };
-  }
-  if (!best) return;
-  const current = await trx
-    .selectFrom('player_rarest')
-    .selectAll()
-    .where('user_id', '=', userId)
-    .forUpdate()
-    .executeTakeFirst();
-  if (!isRarer(best.s, current ? share(current.share_count, current.share_total) : null)) return;
-  const values = {
-    share_count: best.s.count,
-    share_total: best.s.total,
-    guess_id: best.id,
-    achieved_at: best.at,
-  };
-  await trx
-    .insertInto('player_rarest')
-    .values({ user_id: userId, ...values })
-    .onConflict((oc) => oc.column('user_id').doUpdateSet(values))
-    .execute();
 }
 
 export type GuessResultView =
@@ -408,7 +296,13 @@ export async function submitGuess(
 
         if (r.kind !== 'already_guessed' && !part.first_guess_at) {
           if (
-            !(await chargeFirstGuess(trx, userId, part.id, game.poll_id, game.snapshot_id, now))
+            !(await chargeParticipant(trx, {
+              userId,
+              participationId: part.id,
+              pollId: game.poll_id,
+              snapshotId: game.snapshot_id,
+              now,
+            }))
           ) {
             // New day already full: never accept an uncharged guess (§23.3). Release safely instead.
             await endParticipation(trx, gameId, userId, 'released', now);

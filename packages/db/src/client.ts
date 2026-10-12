@@ -299,7 +299,8 @@ export interface Database {
   };
   game_participations: {
     id: Generated<string>;
-    game_id: string;
+    game_id: string | null;
+    match_id: ColumnType<string | null, string | null | undefined, string | null>;
     user_id: string;
     active: Generated<boolean>;
     charge_et_date: ColumnType<string | null, string | null | undefined, string | null>;
@@ -349,7 +350,76 @@ export interface Database {
     share_count: number;
     share_total: number;
     guess_id: string;
+    guess_source: ColumnType<'game' | 'match', 'game' | 'match' | undefined, 'game' | 'match'>;
     achieved_at: Timestamp;
+  };
+  matches: {
+    id: Generated<string>;
+    mode: 'h2h' | 'teams' | 'ffa';
+    format: 'classic' | 'speed';
+    source: 'public' | 'private';
+    status: ColumnType<
+      'lobby' | 'active' | 'ended' | 'closed',
+      'lobby' | 'active' | 'ended' | 'closed' | undefined,
+      'lobby' | 'active' | 'ended' | 'closed'
+    >;
+    room_code: string | null;
+    host_user_id: string | null;
+    poll_id: string | null;
+    snapshot_id: string | null;
+    started_at: NullableTimestamp;
+    ends_at: NullableTimestamp;
+    turn_order: ColumnType<string[] | null, string | null | undefined, string | null>;
+    turn_index: number | null;
+    turn_started_at: NullableTimestamp;
+    ended_at: NullableTimestamp;
+    valid: Generated<boolean>;
+    state_version: Generated<number>;
+    created_at: Timestamp;
+  };
+  match_sides: {
+    id: Generated<string>;
+    match_id: string;
+    side_index: number;
+    rotation: ColumnType<string[], string | undefined, string>;
+    rotation_index: Generated<number>;
+    score_count: Generated<number>;
+    strikes: Generated<number>;
+    accepted: Generated<number>;
+    correct_count: Generated<number>;
+    reached_score_at: NullableTimestamp;
+    finished: Generated<boolean>;
+    placement: number | null;
+    outcome: 'win' | 'loss' | 'draw' | null;
+  };
+  match_players: {
+    match_id: string;
+    user_id: string;
+    side_id: string | null;
+    preferred_team: number | null;
+    joined_at: Timestamp;
+  };
+  matchmaking_queue: {
+    user_id: string;
+    mode: 'h2h' | 'teams' | 'ffa';
+    format: 'classic' | 'speed';
+    enqueued_at: Timestamp;
+  };
+  match_guesses: {
+    id: Generated<string>;
+    ord: Generated<string>;
+    match_id: string;
+    side_id: string;
+    submitted_by: string;
+    client_request_id: string;
+    seq: number | null;
+    normalized_key: string;
+    group_id: string | null;
+    result: 'correct' | 'incorrect' | 'duplicate';
+    share_count: number | null;
+    share_total: number | null;
+    raw_text_enc: string;
+    at: Timestamp;
   };
 }
 

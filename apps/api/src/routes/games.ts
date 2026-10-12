@@ -4,6 +4,7 @@ import { currentUser, requireRole, requireUser } from '../auth/guards.js';
 import type { AppDeps } from '../core/deps.js';
 import { parse } from '../core/validate.js';
 import * as solo from '../modules/games/solo.js';
+import { matchStats } from '../modules/matches/service.js';
 import { answerKeysForStaff, mergeAnswerKeys } from '../modules/results/snapshots.js';
 import { playerStats, rarestRecord } from '../modules/stats/service.js';
 
@@ -47,7 +48,10 @@ export function registerGameRoutes(app: FastifyInstance, deps: AppDeps): void {
     return solo.submitGuess(deps, currentUser(req).userId, id, body.text, body.clientRequestId);
   });
 
-  app.get('/me/stats', user, async (req) => playerStats(deps.db, currentUser(req).userId));
+  app.get('/me/stats', user, async (req) => ({
+    ...(await playerStats(deps.db, currentUser(req).userId)),
+    multiplayer: await matchStats(deps, currentUser(req).userId),
+  }));
 
   app.get('/records/rarest-guess', user, async () => {
     const r = await rarestRecord(deps.db);

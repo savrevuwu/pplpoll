@@ -6,6 +6,7 @@ import type { Kysely } from 'kysely';
 import { Crypto } from '../../src/core/crypto.js';
 import type { AppDeps } from '../../src/core/deps.js';
 import { createLogger } from '../../src/logger.js';
+import { MatchEvents } from '../../src/modules/matches/events.js';
 import type { EmailMessage } from '../../src/modules/email/outbox.js';
 import { insertAccount } from '../../src/modules/accounts/service.js';
 import { buildServer } from '../../src/server.js';
@@ -55,6 +56,7 @@ export async function createHarness(
     secureCookies: false,
     authRateLimit: { max: opts.rateLimitMax ?? 10_000, timeWindowMs: 60_000 },
     answerRateLimit: { max: opts.answerRateLimitMax ?? 10_000, timeWindowMs: 60_000 },
+    events: new MatchEvents(),
   };
   const app = await buildServer(deps);
   return {

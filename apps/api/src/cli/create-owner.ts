@@ -14,6 +14,7 @@ import { Crypto, loadSecrets } from '../core/crypto.js';
 import type { AppDeps } from '../core/deps.js';
 import { createLogger } from '../logger.js';
 import { insertAccount } from '../modules/accounts/service.js';
+import { MatchEvents } from '../modules/matches/events.js';
 
 const { OWNER_EMAIL = '', OWNER_USERNAME = '', OWNER_PASSWORD = '', DATABASE_URL } = process.env;
 if (!DATABASE_URL) throw new Error('DATABASE_URL is required');
@@ -30,6 +31,7 @@ const deps: AppDeps = {
   secureCookies: true,
   authRateLimit: { max: 10, timeWindowMs: 60_000 },
   answerRateLimit: { max: 60, timeWindowMs: 60_000 },
+  events: new MatchEvents(),
 };
 
 try {
