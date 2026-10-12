@@ -9,6 +9,7 @@ const IdParam = z.strictObject({ id: z.uuid() });
 const ModeFormat = z.strictObject({
   mode: z.enum(['h2h', 'teams', 'ffa']),
   format: z.enum(['classic', 'speed']),
+  bestOf: z.union([z.literal(1), z.literal(3), z.literal(5)]).optional(),
 });
 
 export function registerMatchRoutes(app: FastifyInstance, deps: AppDeps): void {

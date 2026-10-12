@@ -374,6 +374,9 @@ export interface Database {
     turn_started_at: NullableTimestamp;
     ended_at: NullableTimestamp;
     valid: Generated<boolean>;
+    best_of: Generated<number>;
+    series_id: string | null;
+    round_number: number | null;
     state_version: Generated<number>;
     created_at: Timestamp;
   };
@@ -403,6 +406,7 @@ export interface Database {
     user_id: string;
     mode: 'h2h' | 'teams' | 'ffa';
     format: 'classic' | 'speed';
+    best_of: Generated<number>;
     enqueued_at: Timestamp;
   };
   match_guesses: {
@@ -420,6 +424,18 @@ export interface Database {
     share_total: number | null;
     raw_text_enc: string;
     at: Timestamp;
+  };
+  series: {
+    id: Generated<string>;
+    best_of: number;
+    status: ColumnType<
+      'active' | 'ended' | 'no_contest',
+      'active' | 'ended' | 'no_contest' | undefined,
+      'active' | 'ended' | 'no_contest'
+    >;
+    winner_side_index: number | null;
+    created_at: Timestamp;
+    ended_at: NullableTimestamp;
   };
 }
 

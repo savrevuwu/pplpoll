@@ -27,7 +27,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       state_version integer NOT NULL DEFAULT 0,
       created_at timestamptz NOT NULL DEFAULT now(),
       CHECK (status IN ('lobby','closed') OR (poll_id IS NOT NULL AND snapshot_id IS NOT NULL AND started_at IS NOT NULL AND ends_at IS NOT NULL)),
-      CHECK ((source = 'private') = (room_code IS NOT NULL))
+      CONSTRAINT matches_private_room_code CHECK ((source = 'private') = (room_code IS NOT NULL))
     )
   `.execute(db);
   await sql`CREATE INDEX matches_active_idx ON matches (ends_at) WHERE status = 'active'`.execute(

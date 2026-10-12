@@ -63,18 +63,18 @@ Conventions: JSON over HTTPS; session cookie + `X-CSRF-Token` on mutations; `Ide
 
 ## Multiplayer (M5a) — implemented
 
-| Method          | Path                        | Notes / errors                                                                                                     |
-| --------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| POST            | `/matches/rooms`            | `{mode: h2h/teams/ffa, format: classic/speed}` → lobby with room code; `ALREADY_BUSY`                              |
-| POST            | `/matches/rooms/join`       | `{code}`; `ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_BUSY`                                                            |
-| POST            | `/matches/{id}/team`        | Teams lobby: `{team: 0/1}`; `TEAM_FULL`                                                                            |
-| POST            | `/matches/{id}/start`       | host only; `WRONG_PLAYER_COUNT`, `PLAYER_UNAVAILABLE`, `NO_SHARED_POLL`                                            |
-| POST            | `/matches/{id}/leave-lobby` | lobby only; host passes to the next player                                                                         |
-| POST/DELETE/GET | `/matchmaking/queue`        | join `{mode, format}` / cancel / status (`matchId` once matched); `DAILY_LIMIT_REACHED`                            |
-| GET             | `/matches/current`          | your active match or lobby id                                                                                      |
-| GET             | `/matches/{id}`             | per-viewer view: question, clock, turn, sides (own side with words; others numbered results only), places/outcomes |
-| POST            | `/matches/{id}/guesses`     | `{text, clientRequestId}`; `NOT_YOUR_TURN`, `SIDE_FINISHED`, `MATCH_NOT_ACTIVE`                                    |
-| WS              | `/ws`                       | send `{subscribe: matchId}`; receive `{type: match.updated, matchId}`, `match.started`, `match.ended` — ids only   |
+| Method          | Path                        | Notes / errors                                                                                                                                                                   |
+| --------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST            | `/matches/rooms`            | `{mode: h2h/teams/ffa, format: classic/speed}` → lobby with room code; `ALREADY_BUSY`                                                                                            |
+| POST            | `/matches/rooms/join`       | `{code}`; `ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_BUSY`                                                                                                                          |
+| POST            | `/matches/{id}/team`        | Teams lobby: `{team: 0/1}`; `TEAM_FULL`                                                                                                                                          |
+| POST            | `/matches/{id}/start`       | host only; `WRONG_PLAYER_COUNT`, `PLAYER_UNAVAILABLE`, `NO_SHARED_POLL`                                                                                                          |
+| POST            | `/matches/{id}/leave-lobby` | lobby only; host passes to the next player                                                                                                                                       |
+| POST/DELETE/GET | `/matchmaking/queue`        | join `{mode, format, bestOf?}` / cancel / status (`matchId` once matched); `DAILY_LIMIT_REACHED`                                                                                 |
+| GET             | `/matches/current`          | your active match or lobby id                                                                                                                                                    |
+| GET             | `/matches/{id}`             | per-viewer view: series (best-of, wins, rounds), question (hidden until a round starts), clock, turn, sides (own side with words; others numbered results only), places/outcomes |
+| POST            | `/matches/{id}/guesses`     | `{text, clientRequestId}`; `NOT_YOUR_TURN`, `SIDE_FINISHED`, `MATCH_NOT_ACTIVE`                                                                                                  |
+| WS              | `/ws`                       | send `{subscribe: matchId}`; receive `{type: match.updated, matchId}`, `match.started`, `match.ended` — ids only                                                                 |
 
 ## Social & moderation (M6) — to be detailed at M6 start
 

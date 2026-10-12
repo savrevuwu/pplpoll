@@ -15,7 +15,9 @@ import {
   rankStandings,
   replayEligible,
   share,
+  tallySeries,
   validPlayerCount,
+  type BestOf,
   type MatchFormat,
   type MatchMode,
 } from '@pplpoll/domain';
@@ -36,6 +38,19 @@ type Trx = Transaction<Database>;
 type MatchRow = Selectable<Database['matches']>;
 
 const ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/** Pause between series rounds so players can see the result before the next poll starts. */
+export const ROUND_BREAK_MS = 10_000;
+
+export type MatchSetup = { mode: MatchMode; format: MatchFormat; bestOf?: 1 | 3 | 5 | undefined };
+
+function checkBestOf(input: MatchSetup): 1 | 3 | 5 {
+  const bestOf = input.bestOf ?? 1;
+  if (bestOf !== 1 && input.mode === 'ffa') {
+    throw new AppError(400, 'BEST_OF_NOT_ALLOWED', 'Best-of series are for Head-to-Head and Teams');
+  }
+  return bestOf;
+}
 
 const busy = () =>
   new AppError(409, 'ALREADY_BUSY', 'Finish your current game, lobby or queue first');
@@ -137,7 +152,12 @@ function shuffle<T>(xs: readonly T[]): T[] {
  * A poll every participant may play: latest snapshot eligible, still a live survey, and for each
  * player either never played or replay-eligible (§7, §23.2). Chosen by the server at random.
  */
-async function pickSharedPoll(trx: Trx, userIds: readonly string[], now: Date) {
+async function pickSharedPoll(
+  trx: Trx,
+  userIds: readonly string[],
+  now: Date,
+  exclude: readonly string[] = [],
+) {
   const latest = await sql<{
     id: string;
     poll_id: string;
@@ -159,6 +179,7 @@ async function pickSharedPoll(trx: Trx, userIds: readonly string[], now: Date) {
   const open = latest.rows.filter(
     (c) =>
       c.eligible &&
+      !exclude.includes(c.poll_id) &&
       played
         .filter((p) => p.poll_id === c.poll_id)
         .every((p) =>
@@ -179,16 +200,20 @@ async function pickSharedPoll(trx: Trx, userIds: readonly string[], now: Date) {
  */
 async function startMatch(
   trx: Trx,
-  match: { id: string; format: MatchFormat },
+  match: { id: string; format: MatchFormat; bestOf: number; seriesId?: string; round?: number },
   sides: readonly (readonly string[])[],
   now: Date,
   pending: Pending,
+  opts: { startAt?: Date; excludePolls?: readonly string[] } = {},
 ) {
   const everyone = sides.flat();
+  // A new series needs enough daily games for every round (G1); later rounds need one each.
+  const gamesNeeded = match.bestOf > 1 && !match.seriesId ? match.bestOf : 1;
   for (const u of everyone) {
-    if ((await chargedOn(trx, u, etDate(now))) >= DAILY_GAME_LIMIT) throw unavailable();
+    if ((await chargedOn(trx, u, etDate(now))) + gamesNeeded > DAILY_GAME_LIMIT)
+      throw unavailable();
   }
-  const snap = await pickSharedPoll(trx, everyone, now);
+  const snap = await pickSharedPoll(trx, everyone, now, opts.excludePolls);
   if (!snap) throw noSharedPoll();
 
   for (const u of everyone) {
@@ -221,17 +246,30 @@ async function startMatch(
       .execute();
   }
 
+  let seriesId = match.seriesId ?? null;
+  if (match.bestOf > 1 && !seriesId) {
+    seriesId = (
+      await trx
+        .insertInto('series')
+        .values({ best_of: match.bestOf, created_at: now })
+        .returning('id')
+        .executeTakeFirstOrThrow()
+    ).id;
+  }
+  const startAt = opts.startAt ?? now;
   await trx
     .updateTable('matches')
     .set({
       status: 'active',
       poll_id: snap.poll_id,
       snapshot_id: snap.id,
-      started_at: now,
-      ends_at: new Date(now.getTime() + MATCH_DURATION_MS[match.format]),
+      started_at: startAt,
+      ends_at: new Date(startAt.getTime() + MATCH_DURATION_MS[match.format]),
       turn_order: match.format === 'classic' ? JSON.stringify(shuffle(sideIds)) : null,
       turn_index: match.format === 'classic' ? 0 : null,
-      turn_started_at: match.format === 'classic' ? now : null,
+      turn_started_at: match.format === 'classic' ? startAt : null,
+      series_id: seriesId,
+      round_number: seriesId ? (match.round ?? 1) : null,
     })
     .where('id', '=', match.id)
     .execute();
@@ -250,12 +288,9 @@ async function startMatch(
 // Private rooms
 // ---------------------------------------------------------------------------------------------
 
-export async function createRoom(
-  deps: AppDeps,
-  userId: string,
-  input: { mode: MatchMode; format: MatchFormat },
-) {
+export async function createRoom(deps: AppDeps, userId: string, input: MatchSetup) {
   const now = deps.clock();
+  const bestOf = checkBestOf(input);
   const matchId = await deps.db.transaction().execute(async (trx) => {
     await lockUser(trx, userId);
     if (await isBusy(trx, userId)) throw busy();
@@ -268,7 +303,9 @@ export async function createRoom(
         const m = await trx
           .insertInto('matches')
           .values({
-            ...input,
+            mode: input.mode,
+            format: input.format,
+            best_of: bestOf,
             source: 'private',
             room_code: code,
             host_user_id: userId,
@@ -441,7 +478,13 @@ export async function startRoom(deps: AppDeps, userId: string, matchId: string) 
     } else {
       sides = players.map((p) => [p.user_id]);
     }
-    await startMatch(trx, { id: matchId, format: m.format }, sides, now, pending);
+    await startMatch(
+      trx,
+      { id: matchId, format: m.format, bestOf: m.best_of },
+      sides,
+      now,
+      pending,
+    );
   });
   pending.flush(deps);
   return getMatchView(deps, userId, matchId);
@@ -451,16 +494,13 @@ export async function startRoom(deps: AppDeps, userId: string, matchId: string) 
 // Public matchmaking: first available compatible players (§7)
 // ---------------------------------------------------------------------------------------------
 
-export async function enqueue(
-  deps: AppDeps,
-  userId: string,
-  input: { mode: MatchMode; format: MatchFormat },
-) {
+export async function enqueue(deps: AppDeps, userId: string, input: MatchSetup) {
   const now = deps.clock();
+  const bestOf = checkBestOf(input);
   await deps.db.transaction().execute(async (trx) => {
     await lockUser(trx, userId);
     if (await isBusy(trx, userId)) throw busy();
-    if ((await chargedOn(trx, userId, etDate(now))) >= DAILY_GAME_LIMIT) {
+    if ((await chargedOn(trx, userId, etDate(now))) + bestOf > DAILY_GAME_LIMIT) {
       throw new AppError(
         409,
         'DAILY_LIMIT_REACHED',
@@ -469,10 +509,16 @@ export async function enqueue(
     }
     await trx
       .insertInto('matchmaking_queue')
-      .values({ user_id: userId, ...input, enqueued_at: now })
+      .values({
+        user_id: userId,
+        mode: input.mode,
+        format: input.format,
+        best_of: bestOf,
+        enqueued_at: now,
+      })
       .execute();
   });
-  await runMatcher(deps, input.mode, input.format);
+  await runMatcher(deps, input.mode, input.format, bestOf);
   return queueStatus(deps, userId);
 }
 
@@ -484,10 +530,17 @@ export async function cancelQueue(deps: AppDeps, userId: string) {
 export async function queueStatus(deps: AppDeps, userId: string) {
   const q = await deps.db
     .selectFrom('matchmaking_queue')
-    .select(['mode', 'format', 'enqueued_at'])
+    .select(['mode', 'format', 'best_of', 'enqueued_at'])
     .where('user_id', '=', userId)
     .executeTakeFirst();
-  if (q) return { queued: true, mode: q.mode, format: q.format, since: q.enqueued_at };
+  if (q)
+    return {
+      queued: true,
+      mode: q.mode,
+      format: q.format,
+      bestOf: q.best_of,
+      since: q.enqueued_at,
+    };
   return { queued: false, matchId: (await currentMatchId(deps, userId)) ?? null };
 }
 
@@ -496,12 +549,13 @@ export async function runMatcher(
   deps: AppDeps,
   mode: MatchMode,
   format: MatchFormat,
+  bestOf: number = 1,
 ): Promise<number> {
   let made = 0;
   for (;;) {
     const pending = new Pending();
     const formed = await deps.db.transaction().execute(async (trx) => {
-      await sql`SELECT pg_advisory_xact_lock(hashtext(${`matchmaking:${mode}:${format}`}))`.execute(
+      await sql`SELECT pg_advisory_xact_lock(hashtext(${`matchmaking:${mode}:${format}:${bestOf}`}))`.execute(
         trx,
       );
       const now = deps.clock();
@@ -510,6 +564,7 @@ export async function runMatcher(
         .select('user_id')
         .where('mode', '=', mode)
         .where('format', '=', format)
+        .where('best_of', '=', bestOf)
         .orderBy('enqueued_at')
         .orderBy('user_id')
         .execute();
@@ -521,6 +576,7 @@ export async function runMatcher(
         .values({
           mode,
           format,
+          best_of: bestOf,
           source: 'public',
           room_code: null,
           host_user_id: null,
@@ -549,7 +605,7 @@ export async function runMatcher(
           : group.map((u) => [u]);
       try {
         await sql`SAVEPOINT start_match`.execute(trx);
-        await startMatch(trx, { id: m.id, format }, sides, now, pending);
+        await startMatch(trx, { id: m.id, format, bestOf }, sides, now, pending);
       } catch (err) {
         if (!(err instanceof AppError)) throw err;
         await sql`ROLLBACK TO SAVEPOINT start_match`.execute(trx);
@@ -583,6 +639,8 @@ async function refresh(
   pending: Pending,
 ): Promise<MatchRow> {
   if (match.status !== 'active') return match;
+  // A series round may be scheduled a few seconds ahead (break between rounds).
+  if (now.getTime() < match.started_at!.getTime()) return match;
   const sides = await trx
     .selectFrom('match_sides')
     .selectAll()
@@ -686,6 +744,117 @@ async function finalize(trx: Trx, matchId: string, endedAt: Date, pending: Pendi
   await audit(trx, { actor: null, action: 'match.end', targetType: 'match', targetId: matchId });
   for (const p of parts) pending.users.set(p.user_id, { type: 'match.ended', matchId });
   await bump(trx, matchId, pending);
+  if (m.series_id) await progressSeries(trx, { ...m, status: 'ended' }, endedAt, pending);
+}
+
+/**
+ * After a series round: the side winning a majority of decided rounds wins the series (update §4).
+ * A drawn round doesn't count and another round is played on a new poll (G8). If the next round
+ * can't start (no poll left that every player may play), the series ends with no winner.
+ */
+async function progressSeries(trx: Trx, m: MatchRow, endedAt: Date, pending: Pending) {
+  const series = await trx
+    .selectFrom('series')
+    .selectAll()
+    .where('id', '=', m.series_id!)
+    .forUpdate()
+    .executeTakeFirstOrThrow();
+  if (series.status !== 'active') return;
+  const rounds = await trx
+    .selectFrom('matches as r')
+    .innerJoin('match_sides as s', 's.match_id', 'r.id')
+    .select(['r.id', 'r.round_number', 'r.poll_id', 's.side_index', 's.outcome'])
+    .where('r.series_id', '=', series.id)
+    .where('r.status', '=', 'ended')
+    .orderBy('r.round_number')
+    .execute();
+  const winners: ('a' | 'b')[] = [];
+  for (const id of [...new Set(rounds.map((r) => r.id))]) {
+    const w = rounds.find((r) => r.id === id && r.outcome === 'win');
+    if (w) winners.push(w.side_index === 0 ? 'a' : 'b');
+  }
+  const tally = tallySeries(series.best_of as BestOf, winners);
+  const players = await trx
+    .selectFrom('match_players')
+    .select('user_id')
+    .where('match_id', '=', m.id)
+    .execute();
+  if (tally.winner) {
+    await trx
+      .updateTable('series')
+      .set({ status: 'ended', winner_side_index: tally.winner === 'a' ? 0 : 1, ended_at: endedAt })
+      .where('id', '=', series.id)
+      .execute();
+    for (const p of players) pending.users.set(p.user_id, { type: 'series.ended', matchId: m.id });
+    return;
+  }
+
+  const sides = await trx
+    .selectFrom('match_sides')
+    .select(['side_index', 'rotation'])
+    .where('match_id', '=', m.id)
+    .orderBy('side_index')
+    .execute();
+  const next = await trx
+    .insertInto('matches')
+    .values({
+      mode: m.mode,
+      format: m.format,
+      best_of: m.best_of,
+      source: m.source,
+      room_code: null,
+      host_user_id: m.host_user_id,
+      series_id: series.id,
+      round_number: m.round_number! + 1,
+      created_at: endedAt,
+    })
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  await trx
+    .insertInto('match_players')
+    .values(
+      players.map((p) => ({
+        match_id: next.id,
+        user_id: p.user_id,
+        preferred_team: null,
+        side_id: null,
+        joined_at: endedAt,
+      })),
+    )
+    .execute();
+  try {
+    await sql`SAVEPOINT next_round`.execute(trx);
+    await startMatch(
+      trx,
+      {
+        id: next.id,
+        format: m.format,
+        bestOf: m.best_of,
+        seriesId: series.id,
+        round: m.round_number! + 1,
+      },
+      sides.map((s) => s.rotation),
+      endedAt,
+      pending,
+      {
+        startAt: new Date(endedAt.getTime() + ROUND_BREAK_MS),
+        excludePolls: [...new Set(rounds.map((r) => r.poll_id!))],
+      },
+    );
+    for (const p of players)
+      pending.users.set(p.user_id, { type: 'series.next_round', matchId: next.id });
+  } catch (err) {
+    if (!(err instanceof AppError)) throw err;
+    await sql`ROLLBACK TO SAVEPOINT next_round`.execute(trx);
+    await trx.deleteFrom('match_players').where('match_id', '=', next.id).execute();
+    await trx.updateTable('matches').set({ status: 'closed' }).where('id', '=', next.id).execute();
+    await trx
+      .updateTable('series')
+      .set({ status: 'no_contest', ended_at: endedAt })
+      .where('id', '=', series.id)
+      .execute();
+    for (const p of players) pending.users.set(p.user_id, { type: 'series.ended', matchId: m.id });
+  }
 }
 
 /** Ends matches whose clock ran out. Run by a ticker so players see results without acting. */
@@ -710,6 +879,39 @@ export async function finishExpiredMatches(deps: AppDeps, now: Date): Promise<nu
 // ---------------------------------------------------------------------------------------------
 // Guessing
 // ---------------------------------------------------------------------------------------------
+
+async function seriesView(trx: Trx, seriesId: string) {
+  const s = await trx
+    .selectFrom('series')
+    .selectAll()
+    .where('id', '=', seriesId)
+    .executeTakeFirstOrThrow();
+  const rounds = await trx
+    .selectFrom('matches as r')
+    .leftJoin('match_sides as sd', (j) =>
+      j.onRef('sd.match_id', '=', 'r.id').on('sd.outcome', '=', 'win'),
+    )
+    .select(['r.id', 'r.round_number', 'r.status', 'sd.side_index'])
+    .where('r.series_id', '=', seriesId)
+    .where('r.status', '!=', 'closed')
+    .orderBy('r.round_number')
+    .execute();
+  const wins = [0, 0];
+  for (const r of rounds)
+    if (r.side_index !== null && r.side_index !== undefined) wins[r.side_index]!++;
+  return {
+    bestOf: s.best_of,
+    status: s.status,
+    winnerSideIndex: s.winner_side_index,
+    wins,
+    rounds: rounds.map((r) => ({
+      round: r.round_number,
+      matchId: r.id,
+      status: r.status,
+      winnerSideIndex: r.side_index ?? null,
+    })),
+  };
+}
 
 async function sideBoard(
   trx: Trx,
@@ -781,6 +983,8 @@ export async function submitMatchGuess(
     m = await refresh(trx, deps, m, now, pending);
     if (m.status !== 'active' || !snap)
       throw new AppError(409, 'MATCH_NOT_ACTIVE', 'This match is not in progress');
+    if (now < m.started_at!)
+      throw new AppError(409, 'ROUND_NOT_STARTED', 'The next round starts in a moment');
     const side = await trx
       .selectFrom('match_sides')
       .selectAll()
@@ -950,6 +1154,7 @@ export async function getMatchView(deps: AppDeps, userId: string, matchId: strin
       format: m.format,
       source: m.source,
       status: m.status,
+      bestOf: m.best_of,
     };
 
     if (m.status === 'lobby' || m.status === 'closed') {
@@ -986,11 +1191,16 @@ export async function getMatchView(deps: AppDeps, userId: string, matchId: strin
       .execute();
     const pct = (count: number) => formatPercent(share(count, snap.respondents));
     const currentSide =
-      m.format === 'classic' && m.status === 'active' ? m.turn_order![m.turn_index!] : null;
+      m.format === 'classic' && m.status === 'active' && now >= m.started_at!
+        ? m.turn_order![m.turn_index!]
+        : null;
+    const series = m.series_id ? await seriesView(trx, m.series_id) : null;
 
     return {
       ...base,
-      question: poll.text,
+      series,
+      // Before a series round begins, the question stays hidden.
+      question: now >= m.started_at! ? poll.text : null,
       clock: {
         startedAt: m.started_at,
         endsAt: m.ends_at,
@@ -1070,7 +1280,29 @@ export async function matchStats(deps: AppDeps, userId: string) {
     .where('p.user_id', '=', userId)
     .where('m.status', '=', 'ended')
     .where('m.valid', '=', true)
+    .where('m.series_id', 'is', null)
     .execute();
+  // A whole Best-of series counts as one game (G11): the player's side wins or loses the series.
+  const seriesRows = await deps.db
+    .selectFrom('series as se')
+    .innerJoin('matches as m', (j) =>
+      j.onRef('m.series_id', '=', 'se.id').on('m.round_number', '=', 1),
+    )
+    .innerJoin('match_players as p', 'p.match_id', 'm.id')
+    .innerJoin('match_sides as s', 's.id', 'p.side_id')
+    .select(['m.mode', 'm.format', 's.side_index', 'se.winner_side_index'])
+    .where('p.user_id', '=', userId)
+    .where('se.status', '=', 'ended')
+    .execute();
+  for (const r of seriesRows) {
+    const won = r.side_index === r.winner_side_index;
+    rows.push({
+      mode: r.mode,
+      format: r.format,
+      outcome: won ? 'win' : 'loss',
+      placement: won ? 1 : 2,
+    });
+  }
   const blank = () => ({ games: 0, wins: 0, losses: 0, draws: 0, first: 0, second: 0, third: 0 });
   const overall = blank();
   const byMode: Record<string, ReturnType<typeof blank>> = {};

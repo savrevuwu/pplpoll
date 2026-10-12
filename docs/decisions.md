@@ -117,6 +117,15 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - **Privacy:** each viewer gets their own projection. Your own side sees its words and answers (teammates included); other sides show only numbered results, correct-guess percentages, totals, strikes and contributions. WebSocket messages carry only ids.
 - **Not in M5a (later batches):** Best-of-3/5 (M5b), pauses/disconnects/Vote to Continue/outages (M5c), tournaments (M5d), spectators and friend challenges (need friends, M6). The real-time bus is in-process; a Redis fan-out is needed before running more than one API instance.
 
+### 1.11 Best-of series (M5b) engineering choices
+
+- Best-of-3 and Best-of-5 for Head-to-Head and Teams, in private rooms and public matchmaking (separate queues per best-of). Friend challenges come with friends (M6).
+- Starting a series needs `best-of` daily games left for every player (G1); each round charges like any match (first accepted guess). Later rounds only check one game left.
+- Rounds start automatically 10 seconds after the previous one ends (results break; the next question stays hidden until then). Same players, same teams, a new poll every round that every player may play and that wasn't used earlier in the series.
+- A drawn round doesn't count; another round is played (G8). The side with the majority of round wins takes the series.
+- If no poll is left for the next round, the series ends with no winner and counts for nobody.
+- Statistics: a whole series counts as one game (G11); per-round guesses still count toward accuracy and Rarest Correct Guess.
+
 ## 2. Architecture decision records
 
 | ADR     | Decision                                                                                                        | Status   |
