@@ -1,0 +1,32 @@
+{
+  "name": "pplpoll",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:unit": "vitest run --project domain --project api-unit",
+    "migrate:up": "pnpm --filter @pplpoll/db migrate:up",
+    "migrate:down": "pnpm --filter @pplpoll/db migrate:down",
+    "dev:api": "pnpm --filter @pplpoll/api dev",
+    "dev:web": "pnpm --filter @pplpoll/web dev",
+    "build:web": "pnpm --filter @pplpoll/web build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^4.1.11"
+  }
+}

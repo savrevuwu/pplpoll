@@ -1,78 +1,81 @@
 # Data Model (PROPOSAL)
 
 PostgreSQL 16. All IDs `uuid` (v7). All timestamps `timestamptz` (UTC). Business days stored as `et_date date` computed in `America/New_York`.
-Retention classes (§13): `ACCOUNT` (hidden/restored with account state), `POLL` (independent question content), `AGGREGATE` (non-identifying survey results), `UNIQUENESS` (minimum dedup proof), `EVIDENCE` (confidential), `AUDIT` (append-only). Retention *durations* are config, filled by legal review (decisions L2).
+Retention classes (§13): `ACCOUNT` (hidden/restored with account state), `POLL` (independent question content), `AGGREGATE` (non-identifying survey results), `UNIQUENESS` (minimum dedup proof), `EVIDENCE` (confidential), `AUDIT` (append-only). Retention _durations_ are config, filled by legal review (decisions L2).
 
 ## 1. Identity & accounts (M1)
 
-| Table | Key columns | Constraints / notes | Class |
-|---|---|---|---|
-| `users` | id, role (`member`,`trainee`,`moderator`,`super_moderator`,`admin`,`owner`), state (`active`,`frozen`,`banned`,`deactivated`,`deleted`), staff_wing_id, created_at | partial unique: exactly one `owner` | ACCOUNT |
-| `credentials` | user_id PK, email_enc, email_lookup (HMAC), password_hash (argon2id), email_verified_at | unique(email_lookup) among non-deleted | ACCOUNT |
-| `username_reservations` | username_lower PK, user_id NULL, reserved_at, reason | **never deleted**; CHECK `^[a-z0-9]{3,20}$` | UNIQUENESS |
-| `profiles` | user_id PK, username (display case), display_name, display_name_changed_at, bio, avatar_id, avatar_last_upload_at | display_name CHECK `^[A-Za-z0-9 ]{1,20}$`, trimmed, not blank | ACCOUNT |
-| `participation_identities` | id, identity_hmac UNIQUE, created_at | survives account deletion; legal review L1 | UNIQUENESS |
-| `user_participation_identity` | user_id PK, participation_identity_id | | UNIQUENESS |
-| `invite_codes` | id, code_hash UNIQUE, max_uses, uses_count, expires_at, revoked_at, created_by | CHECK uses_count ≤ max_uses | AUDIT |
-| `invite_redemptions` | id, invite_id, user_id UNIQUE, redeemed_at | inserted in same tx as user creation | AUDIT |
-| `sessions` | id, user_id, token_hash, created_at, last_interactive_auth_at, expires_at, revoked_at | | ACCOUNT |
-| `account_lifecycle` | user_id PK, generation, deactivated_at, deletion_due_at, warning_due_at, warning_sent_at, reactivated_at | `deletion_due_at` = deactivated ET date + 1 calendar year; `warning_due_at` = due − 30 days | ACCOUNT |
-| `account_lifecycle_events` | id, user_id, generation, kind, at, actor | append-only | AUDIT |
+| Table                         | Key columns                                                                                                                                                        | Constraints / notes                                                                         | Class      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------- |
+| `users`                       | id, role (`member`,`trainee`,`moderator`,`super_moderator`,`admin`,`owner`), state (`active`,`frozen`,`banned`,`deactivated`,`deleted`), staff_wing_id, created_at | partial unique: exactly one `owner`                                                         | ACCOUNT    |
+| `credentials`                 | user_id PK, email_enc, email_lookup (HMAC), password_hash (argon2id), email_verified_at                                                                            | unique(email_lookup) among non-deleted                                                      | ACCOUNT    |
+| `username_reservations`       | username_lower PK, user_id NULL, reserved_at, reason                                                                                                               | **never deleted**; CHECK `^[a-z0-9]{3,20}$`                                                 | UNIQUENESS |
+| `profiles`                    | user_id PK, username (display case), display_name, display_name_changed_at, bio, avatar_id, avatar_last_upload_at                                                  | display_name CHECK `^[A-Za-z0-9 ]{1,20}$`, trimmed, not blank                               | ACCOUNT    |
+| `participation_identities`    | id, identity_hmac UNIQUE, created_at                                                                                                                               | survives account deletion; legal review L1                                                  | UNIQUENESS |
+| `user_participation_identity` | user_id PK, participation_identity_id                                                                                                                              |                                                                                             | UNIQUENESS |
+| `invite_codes`                | id, code_hash UNIQUE, max_uses, uses_count, expires_at, revoked_at, created_by                                                                                     | CHECK uses_count ≤ max_uses                                                                 | AUDIT      |
+| `invite_redemptions`          | id, invite_id, user_id UNIQUE, redeemed_at                                                                                                                         | inserted in same tx as user creation                                                        | AUDIT      |
+| `sessions`                    | id, user_id, token_hash, created_at, last_interactive_auth_at, expires_at, revoked_at                                                                              |                                                                                             | ACCOUNT    |
+| `account_lifecycle`           | user_id PK, generation, deactivated_at, deletion_due_at, warning_due_at, warning_sent_at, reactivated_at                                                           | `deletion_due_at` = deactivated ET date + 1 calendar year; `warning_due_at` = due − 30 days | ACCOUNT    |
+| `account_lifecycle_events`    | id, user_id, generation, kind, at, actor                                                                                                                           | append-only                                                                                 | AUDIT      |
 
 ## 2. Polls & Daily Poll (M2)
 
-| Table | Key columns | Constraints / notes | Class |
-|---|---|---|---|
-| `pp_accounts` | user_id PK, balance | CHECK balance ≥ 0; row-locked on spend | ACCOUNT |
-| `pp_ledger` | id, user_id, delta, kind (`daily_award`,`proposal_debit`,`proposal_refund`,`refund_correction`), ref_id, et_date, idempotency_key UNIQUE | partial unique (user_id, et_date) WHERE kind='daily_award'; unique (ref_id, kind) for debit/refund | AUDIT |
-| `poll_proposals` | id, creator_user_id, text, exact_key, visibility (`public`,`anonymous`), status (`pending`,`revision_requested`,`approved`,`rejected`), route (`normal`,`sensitive`,`similarity`), debit_ledger_id | exact duplicate → auto-reject | POLL |
-| `proposal_decisions` | id, proposal_id, actor, action, before_text, after_text, reason, refund (bool), at | append-only | AUDIT |
-| `polls` | id, proposal_id UNIQUE, text, creator_user_id, creator_visibility, status (`queued`,`live_daily`,`survey`,`removed`), debut_et_date UNIQUE NULL, response_count | `queued` ⇒ response_count = 0 (CHECK) | POLL |
-| `daily_schedule` | et_date PK, poll_id UNIQUE, scheduled_by | staff calendar; poll must be `queued` | POLL |
-| `daily_features` | id, et_date, poll_id UNIQUE, kind (`primary`,`emergency_replacement`), replaces_feature_id, active | partial unique (et_date) WHERE active; poll_id unique ⇒ never repeats | POLL |
-| `daily_poll_exceptions` | id, et_date, kind (`queue_empty`,`removed`), detail, alerted_at | | AUDIT |
+| Table                   | Key columns                                                                                                                                                                                        | Constraints / notes                                                                                | Class   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------- |
+| `pp_accounts`           | user_id PK, balance                                                                                                                                                                                | CHECK balance ≥ 0; row-locked on spend                                                             | ACCOUNT |
+| `pp_ledger`             | id, user_id, delta, kind (`daily_award`,`proposal_debit`,`proposal_refund`,`refund_correction`), ref_id, et_date, idempotency_key UNIQUE                                                           | partial unique (user_id, et_date) WHERE kind='daily_award'; unique (ref_id, kind) for debit/refund | AUDIT   |
+| `poll_proposals`        | id, creator_user_id, text, exact_key, visibility (`public`,`anonymous`), status (`pending`,`revision_requested`,`approved`,`rejected`), route (`normal`,`sensitive`,`similarity`), debit_ledger_id | exact duplicate → auto-reject                                                                      | POLL    |
+| `proposal_decisions`    | id, proposal_id, actor, action, before_text, after_text, reason, refund (bool), at                                                                                                                 | append-only                                                                                        | AUDIT   |
+| `polls`                 | id, proposal_id UNIQUE, text, creator_user_id, creator_visibility, status (`queued`,`live_daily`,`survey`,`removed`), debut_et_date UNIQUE NULL, response_count                                    | `queued` ⇒ response_count = 0 (CHECK)                                                              | POLL    |
+| `daily_schedule`        | et_date PK, poll_id UNIQUE, scheduled_by                                                                                                                                                           | staff calendar; poll must be `queued`                                                              | POLL    |
+| `daily_features`        | id, et_date, poll_id UNIQUE, kind (`primary`,`emergency_replacement`), replaces_feature_id, active                                                                                                 | partial unique (et_date) WHERE active; poll_id unique ⇒ never repeats                              | POLL    |
+| `daily_poll_exceptions` | id, et_date, kind (`queue_empty`,`removed`), detail, alerted_at                                                                                                                                    |                                                                                                    | AUDIT   |
 
 ## 3. Survey answering & daily progress (M3)
 
-| Table | Key columns | Constraints / notes | Class |
-|---|---|---|---|
-| `survey_responses` | id, poll_id, participation_identity_id, user_id NULL, normalized_key, answer_group_id NULL, status (`accepted`,`removed`), submitted_at | **partial unique (poll_id, participation_identity_id)**; insert allowed only when poll status ∈ {live_daily, survey} (trigger) | AGGREGATE (+ user_id ACCOUNT) |
-| `survey_response_raw` | response_id PK, raw_text_enc | restricted role only; access logged | EVIDENCE |
-| `daily_assignments` | user_id, et_date, slot (0 = Daily Poll, 1–10 regular), poll_id, feature_id NULL, response_id NULL, counts_for_progress bool | PK (user_id, et_date, slot); unique (user_id, et_date, poll_id) | ACCOUNT |
-| `daily_progress` | user_id, et_date, completed, pp_ledger_id NULL | PK (user_id, et_date); CHECK completed ≤ 11 | ACCOUNT |
-| `streaks` | user_id, kind (`answering`,`guessing`), current, longest, last_et_date, visibility_current, visibility_longest | PK (user_id, kind) | ACCOUNT |
+| Table                 | Key columns                                                                                                                             | Constraints / notes                                                                                                            | Class                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| `survey_responses`    | id, poll_id, participation_identity_id, user_id NULL, normalized_key, answer_group_id NULL, status (`accepted`,`removed`), submitted_at | **partial unique (poll_id, participation_identity_id)**; insert allowed only when poll status ∈ {live_daily, survey} (trigger) | AGGREGATE (+ user_id ACCOUNT) |
+| `survey_response_raw` | response_id PK, raw_text_enc                                                                                                            | restricted role only; access logged                                                                                            | EVIDENCE                      |
+| `daily_assignments`   | user_id, et_date, slot (0 = Daily Poll, 1–10 regular), poll_id, feature_id NULL, response_id NULL, counts_for_progress bool             | PK (user_id, et_date, slot); unique (user_id, et_date, poll_id)                                                                | ACCOUNT                       |
+| `daily_progress`      | user_id, et_date, completed, pp_ledger_id NULL                                                                                          | PK (user_id, et_date); CHECK completed ≤ 11                                                                                    | ACCOUNT                       |
+| `streaks`             | user_id, kind (`answering`,`guessing`), current, longest, last_et_date, visibility_current, visibility_longest                          | PK (user_id, kind)                                                                                                             | ACCOUNT                       |
 
 ## 4. Results & guessing (M4)
 
-| Table | Key columns | Constraints / notes | Class |
-|---|---|---|---|
-| `answer_groups` | id, poll_id, label, created_version | | AGGREGATE |
-| `answer_aliases` | poll_id, normalized_key, group_id, version, approved_by | PK (poll_id, normalized_key, version) | AGGREGATE |
-| `normalization_versions` | version PK, rules_hash, created_at | immutable | AGGREGATE |
-| `result_snapshots` | id, poll_id, version, et_date, normalization_version, respondents, k, guess_cap, eligible, distribution (jsonb, restricted) | unique (poll_id, version); immutable | AGGREGATE |
-| `game_participations` | id, user_id, game_id, status (`reserved`,`active`,`ended`), reserved_at, first_guess_at, charge_et_date, end_reason | **partial unique (user_id) WHERE status IN ('reserved','active')** ⇒ one active game | ACCOUNT |
-| `allowance_events` | id, user_id, participation_id, kind (`reserve`,`charge`,`release`), et_date, at | unique (participation_id, kind) | AUDIT |
-| `daily_charges` | user_id, et_date, charged | PK (user_id, et_date); CHECK charged ≤ 10 | ACCOUNT |
-| `played_polls` | user_id, poll_id, first_played_at, snapshot_id, last_play_at | PK (user_id, poll_id) | ACCOUNT |
-| `games` | id, mode (`solo`,`versus`,`public`,`private`,`friends`), poll_id, snapshot_id, state, state_version, host_user_id, created_at, ended_at, outcome | snapshot_id immutable after start | ACCOUNT |
-| `guesses` | id, participation_id, seq, client_request_id, result (`correct`,`incorrect`,`duplicate`), group_id NULL | unique (participation_id, client_request_id); `duplicate` rows never numbered | ACCOUNT |
-| `guess_raw` | guess_id PK, raw_text_enc | private to guesser + authorized staff | EVIDENCE |
+| Table                    | Key columns                                                                                                                                      | Constraints / notes                                                                  | Class     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | --------- |
+| `answer_groups`          | id, poll_id, label, created_version                                                                                                              |                                                                                      | AGGREGATE |
+| `answer_aliases`         | poll_id, normalized_key, group_id, version, approved_by                                                                                          | PK (poll_id, normalized_key, version)                                                | AGGREGATE |
+| `normalization_versions` | version PK, rules_hash, created_at                                                                                                               | immutable                                                                            | AGGREGATE |
+| `result_snapshots`       | id, poll_id, version, et_date, normalization_version, respondents, k, guess_cap, eligible, distribution (jsonb, restricted)                      | unique (poll_id, version); immutable                                                 | AGGREGATE |
+| `game_participations`    | id, user_id, game_id, status (`reserved`,`active`,`ended`), reserved_at, first_guess_at, charge_et_date, end_reason                              | **partial unique (user_id) WHERE status IN ('reserved','active')** ⇒ one active game | ACCOUNT   |
+| `allowance_events`       | id, user_id, participation_id, kind (`reserve`,`charge`,`release`), et_date, at                                                                  | unique (participation_id, kind)                                                      | AUDIT     |
+| `daily_charges`          | user_id, et_date, charged                                                                                                                        | PK (user_id, et_date); CHECK charged ≤ 10                                            | ACCOUNT   |
+| `played_polls`           | user_id, poll_id, first_played_at, snapshot_id, last_play_at                                                                                     | PK (user_id, poll_id)                                                                | ACCOUNT   |
+| `games`                  | id, mode (`solo`,`versus`,`public`,`private`,`friends`), poll_id, snapshot_id, state, state_version, host_user_id, created_at, ended_at, outcome | snapshot_id immutable after start                                                    | ACCOUNT   |
+| `guesses`                | id, participation_id, seq, client_request_id, result (`correct`,`incorrect`,`duplicate`), group_id NULL                                          | unique (participation_id, client_request_id); `duplicate` rows never numbered        | ACCOUNT   |
+| `guess_raw`              | guess_id PK, raw_text_enc                                                                                                                        | private to guesser + authorized staff                                                | EVIDENCE  |
 
 ## 5. Multiplayer (M5)
+
 `match_members` (game_id, user_id, role `player`/`spectator`, status `active`/`disconnected`/`forfeited`/`removed`, ready_at), `match_events` (game_id, seq UNIQUE per game, type, payload, server_ts — append-only), `match_votes` (vote_round_id, voter_id UNIQUE per round, value), `vote_rounds` (id, game_id, kind `pause`/`disconnect`/`nevermind`/`kick`/`continue`, opened_at, closes_at, eligible_voters[], threshold, result), `pause_usage` (game_id, used CHECK ≤ 2), `spectator_permissions` (game_id, policy).
 
 ## 6. Social, moderation, stats (M6)
+
 `relationships` (friend requests/friends/follows), `blocks` (blocker, blocked; PK pair), `conversations`, `conversation_members`, `messages` (text/emoji/GIF ref only, edited_at, deleted_at), `reactions`, `privacy_settings`, `notification_settings`, `notifications`, `social_links`, `avatars` (processing status), `reports` (category, other_text ≤ 500), `cases`, `case_assignments`, `escalations`, `protective_measures`, `staff_actions` (append-only: actor, target, reason, evidence_refs, before, after, at), `staff_records`, `sensitive_access_log` (Owner-only read), `evidence` (EVIDENCE class), `appeals`, `cheating_investigations`, `achievements`, `user_achievements`, `leaderboard_period_stats` (user, mode, period_kind, period_start, completed, wins, correct, accepted).
 
 ## 7. Lifecycle by account state (§13)
 
-| Data class | Frozen | Banned | Deactivated | Final deletion |
-|---|---|---|---|---|
-| ACCOUNT (profile, messages, social) | hidden, restorable | hidden, restorable if overturned | hidden, restored on sign-in | deleted |
-| POLL (approved questions) | stays; attribution hidden | stays; attribution hidden | stays; attribution hidden | stays; creator link nulled |
-| AGGREGATE (responses, snapshots) | stays | stays | stays | stays; `user_id` nulled |
-| UNIQUENESS (username, participation identity) | stays | stays | stays | stays (legal review) |
-| EVIDENCE / AUDIT | stays | stays | stays | per legal retention |
+| Data class                                    | Frozen                    | Banned                           | Deactivated                 | Final deletion             |
+| --------------------------------------------- | ------------------------- | -------------------------------- | --------------------------- | -------------------------- |
+| ACCOUNT (profile, messages, social)           | hidden, restorable        | hidden, restorable if overturned | hidden, restored on sign-in | deleted                    |
+| POLL (approved questions)                     | stays; attribution hidden | stays; attribution hidden        | stays; attribution hidden   | stays; creator link nulled |
+| AGGREGATE (responses, snapshots)              | stays                     | stays                            | stays                       | stays; `user_id` nulled    |
+| UNIQUENESS (username, participation identity) | stays                     | stays                            | stays                       | stays (legal review)       |
+| EVIDENCE / AUDIT                              | stays                     | stays                            | stays                       | per legal retention        |
 
 ## 8. Migrations & rollback
+
 Kysely migrations in `packages/db/migrations`, numbered; each has `up` and `down`. Breaking changes use expand → backfill → contract over separate deploys. CI runs `up → down → up` on a clean database. Production rollback = deploy previous app version (compatible with expanded schema) — never `down` on prod data without a backup.

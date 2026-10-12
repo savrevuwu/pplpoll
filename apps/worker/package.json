@@ -1,0 +1,13 @@
+{
+  "name": "@pplpoll/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "pg-boss": "^12.37.1"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@pplpoll/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@pplpoll/db": "workspace:*",
+    "fastify": "^5.12.5",
+    "kysely": "^0.29.6",
+    "pino": "^10.4.0"
+  }
+}
