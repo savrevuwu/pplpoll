@@ -3,3 +3,4 @@ export * from './identity.js';
 export * from './lifecycle.js';
 export * from './game/index.js';
 export * from './polls.js';
+export * from './answers.js';

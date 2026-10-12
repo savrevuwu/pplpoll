@@ -29,6 +29,7 @@ const deps: AppDeps = {
   clock: () => new Date(),
   secureCookies: true,
   authRateLimit: { max: 10, timeWindowMs: 60_000 },
+  answerRateLimit: { max: 60, timeWindowMs: 60_000 },
 };
 
 try {

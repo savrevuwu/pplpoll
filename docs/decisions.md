@@ -76,6 +76,19 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - Removing the active Daily Poll without a replacement leaves the day "unavailable"; the midnight job does not fill it later that day.
 - The per-user daily in-app Daily Poll announcement and its setting arrive with M3 (answering).
 
+### 1.7 Milestone 3 engineering choices
+
+- One answer per person per poll is enforced by a unique index on (poll, participation identity), so deleted-and-recreated accounts can't answer again (legal review L1 still applies).
+- A database trigger refuses survey answers for polls that are queued or removed: an approved poll can't be answered before its Daily Poll debut.
+- Answer quality gate (deterministic): rejects empty, too long (80+), links/emails, non-answers ("idk", "n/a", "asdf"…), repeated-letter and keyboard-mash text, and owner-configurable blocked words (starts empty; staff removal comes in M6). A rejected answer doesn't use up the person's one answer.
+- Raw answers are encrypted in a separate table; gameplay uses a normalized key (lowercase, no punctuation, no leading a/an/the/my/some, versioned). Synonym/plural grouping comes with answer groups in M4.
+- The 10 regular surveys are picked at random from existing surveys the person never answered, fixed for the day, and topped up on later visits if new ones become available. A smaller pool means fewer surveys and no PP that day.
+- Clients send the poll id they were shown; after 12:00 AM ET (or an emergency swap) the server answers `DAY_ROLLED_OVER` instead of silently crediting a different day or poll.
+- All answering for one person and day is serialized with a lock, so the 11th answer awards exactly one PP even when answers arrive at the same moment.
+- Daily Poll announcement is on by default and shows until seen that day; answering/guessing reminders are off by default ("optional") and disappear once the day's target is met.
+- Answering streak visibility settings (Everyone/Friends/Nobody) are applied with profiles in M6; today only the owner can see their own streaks.
+- Per-person limit: 60 answer submissions per minute.
+
 ## 2. Architecture decision records
 
 | ADR     | Decision                                                                                                        | Status   |

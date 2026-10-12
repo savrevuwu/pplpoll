@@ -198,6 +198,55 @@ export interface Database {
     created_at: Timestamp;
     read_at: NullableTimestamp;
   };
+  survey_responses: {
+    id: Generated<string>;
+    poll_id: string;
+    participation_identity_id: string;
+    user_id: string | null;
+    et_date: DateOnly;
+    context: 'daily_poll' | 'assignment';
+    daily_feature_id: string | null;
+    assignment_slot: number | null;
+    counts_for_progress: boolean;
+    normalized_key: string;
+    normalization_version: number;
+    answer_group_id: string | null;
+    status: ColumnType<
+      'accepted' | 'removed',
+      'accepted' | 'removed' | undefined,
+      'accepted' | 'removed'
+    >;
+    submitted_at: Timestamp;
+  };
+  survey_response_raw: {
+    response_id: string;
+    raw_text_enc: string;
+  };
+  daily_assignments: {
+    user_id: string;
+    et_date: DateOnly;
+    slot: number;
+    poll_id: string;
+    response_id: string | null;
+    created_at: Timestamp;
+  };
+  streaks: {
+    user_id: string;
+    kind: 'answering' | 'guessing';
+    current: Generated<number>;
+    longest: Generated<number>;
+    last_et_date: ColumnType<string | null, string | null | undefined, string | null>;
+  };
+  notification_settings: {
+    user_id: string;
+    daily_poll_announcement: Generated<boolean>;
+    answering_reminder: Generated<boolean>;
+    guessing_reminder: Generated<boolean>;
+  };
+  daily_announcement_seen: {
+    user_id: string;
+    et_date: DateOnly;
+  };
 }
 
 // Return SQL `date` columns as 'YYYY-MM-DD' strings (America/New_York business dates), not JS Dates.

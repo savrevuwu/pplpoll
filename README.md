@@ -2,7 +2,7 @@
 
 Survey collection + popular-answer guessing game platform.
 
-> **Status:** Milestone 0 done. Milestones 1 (accounts) and 2 (poll proposals, staff review, Daily Poll queue and midnight publication) implemented and tested. Survey answering and games not yet.
+> **Status:** Milestone 0 done. Milestones 1 (accounts), 2 (poll proposals, Daily Poll) and 3 (survey answering, 11-a-day Poll Point, answering streak) implemented and tested. Guessing games not yet.
 > Approved product spec: [`docs/spec/The_People_Poll_Master_Specification_v2.md`](docs/spec/The_People_Poll_Master_Specification_v2.md).
 
 ## Quick start

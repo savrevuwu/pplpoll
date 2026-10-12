@@ -10,6 +10,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerHealth } from './routes/health.js';
 import { registerPollRoutes } from './routes/polls.js';
 import { registerStaffRoutes } from './routes/staff.js';
+import { registerSurveyRoutes } from './routes/surveys.js';
 
 export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
@@ -19,7 +20,8 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   }) as unknown as FastifyInstance;
 
   await app.register(cookie);
-  await app.register(rateLimit, { global: false });
+  // Limits run after the session is resolved so per-person keys are available.
+  await app.register(rateLimit, { global: false, hook: 'preHandler' });
 
   app.decorateRequest('auth', null);
   app.addHook('onRequest', async (req) => {
@@ -51,5 +53,6 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   registerAccountRoutes(app, deps);
   registerStaffRoutes(app, deps);
   registerPollRoutes(app, deps);
+  registerSurveyRoutes(app, deps);
   return app;
 }

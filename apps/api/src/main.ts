@@ -15,6 +15,7 @@ const app = await buildServer({
   clock: () => new Date(),
   secureCookies: process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test',
   authRateLimit: { max: 10, timeWindowMs: 15 * 60_000 },
+  answerRateLimit: { max: 60, timeWindowMs: 60_000 },
 });
 const port = Number(process.env.API_PORT ?? 3000);
 

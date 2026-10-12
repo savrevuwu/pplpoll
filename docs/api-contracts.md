@@ -36,13 +36,16 @@ Conventions: JSON over HTTPS; session cookie + `X-CSRF-Token` on mutations; `Ide
 | PUT/DELETE | `/staff/daily/calendar/{date}`                     | admin+           | future dates only                                                                                                 |
 | POST       | `/staff/daily/emergency-replace`                   | admin+           | `{reason, replacementPollId?}`                                                                                    |
 
-## Surveys & PP (M3)
+## Surveys & PP (M3) — implemented
 
-| Method | Path                                 | Notes / errors                                                                                                                              |
-| ------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/daily`                             | today's assignments, progress n/11, PP awarded?, Daily Poll or `DAILY_POLL_UNAVAILABLE`                                                     |
-| POST   | `/daily/assignments/{slot}/response` | `{text}` → `{status:"accepted", message:"Thank you for your response"}`; `ALREADY_ANSWERED`, `DAY_ROLLED_OVER`, `RESPONSE_REJECTED_QUALITY` |
-| GET    | `/me/pp`                             | balance + ledger (own)                                                                                                                      |
+| Method  | Path                                 | Notes / errors                                                                                                                                                                                                   |
+| ------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET     | `/daily`                             | Daily Poll (or unavailable), 10 assigned surveys, progress `{completed, target: 11, possible}`, `ppAwarded`, announcement + reminder flags                                                                       |
+| POST    | `/daily/poll/response`               | `{pollId, text}` → `{status:"accepted", message:"Thank you for your response", alreadyAnswered, countsForProgress, progress, ppAwarded}`; `RESPONSE_REJECTED` (422), `DAY_ROLLED_OVER`, `DAILY_POLL_UNAVAILABLE` |
+| POST    | `/daily/assignments/{slot}/response` | same body/result; `ALREADY_ANSWERED`, `POLL_UNAVAILABLE`, `DAY_ROLLED_OVER`; 60/min per person                                                                                                                   |
+| POST    | `/daily/announcement/seen`           | hides today's announcement                                                                                                                                                                                       |
+| GET     | `/me/streaks`                        | answering + guessing current/longest (own)                                                                                                                                                                       |
+| GET/PUT | `/me/settings/notifications`         | `{dailyPollAnnouncement, answeringReminder, guessingReminder}`                                                                                                                                                   |
 
 ## Guessing (M4)
 

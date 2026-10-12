@@ -33,7 +33,7 @@ export interface Harness {
 }
 
 export async function createHarness(
-  opts: { rateLimitMax?: number; logger?: AppDeps['logger'] } = {},
+  opts: { rateLimitMax?: number; answerRateLimitMax?: number; logger?: AppDeps['logger'] } = {},
 ): Promise<Harness> {
   const db = createDb(TEST_URL);
   await migrateDownAll(db as unknown as Kysely<unknown>);
@@ -46,6 +46,7 @@ export async function createHarness(
     clock: clock.fn,
     secureCookies: false,
     authRateLimit: { max: opts.rateLimitMax ?? 10_000, timeWindowMs: 60_000 },
+    answerRateLimit: { max: opts.answerRateLimitMax ?? 10_000, timeWindowMs: 60_000 },
   };
   const app = await buildServer(deps);
   return {

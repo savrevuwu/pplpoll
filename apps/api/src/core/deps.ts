@@ -14,4 +14,6 @@ export interface AppDeps {
   secureCookies: boolean;
   /** Per-IP limits for brute-forceable auth routes. */
   authRateLimit: { max: number; timeWindowMs: number };
+  /** Per-person limit on survey answer submissions. */
+  answerRateLimit: { max: number; timeWindowMs: number };
 }
