@@ -1,0 +1,24 @@
+# Local development services only. Not used in production.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: pplpoll
+      POSTGRES_PASSWORD: pplpoll
+      POSTGRES_DB: pplpoll
+    ports: ['5432:5432']
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pplpoll']
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7
+    ports: ['6379:6379']
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ['8025:8025', '1025:1025']
+volumes:
+  pgdata:

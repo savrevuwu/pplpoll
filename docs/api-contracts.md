@@ -3,40 +3,79 @@
 Conventions: JSON over HTTPS; session cookie + `X-CSRF-Token` on mutations; `Idempotency-Key` header required on every mutation that changes PP, responses, allowances, or match state. Errors: `{ "error": { "code": "STRING_CODE", "message": "safe text" } }` — never include answers, distributions, other users' data, or moderation details. All inputs validated with Zod; unknown fields rejected (mass-assignment protection). Rate limits per account + per IP (IP never used as identity proof).
 
 ## Auth & account (M1)
-| Method | Path | Notes / errors |
-|---|---|---|
-| POST | `/auth/invite/check` | `{code}` → `{valid}`; brute-force limited; does not consume |
-| POST | `/auth/register` | `{code, email, password, username}`; atomic consume on success; `INVITE_INVALID`, `USERNAME_TAKEN` (incl. reserved), `EMAIL_IN_USE` |
-| POST | `/auth/verify-email` | token |
-| POST | `/auth/login` | interactive sign-in; **reactivates deactivated account** |
-| POST | `/auth/refresh` | background refresh; **never reactivates** |
-| POST | `/auth/logout` | |
-| POST | `/account/deactivate` | starts new one-year period |
-| PATCH | `/me/profile` | display name (168 h rule), bio |
-| PUT/DELETE | `/me/avatar` | upload → async processing; DELETE doesn't reset cooldown |
 
-## Polls & proposals (M2)
-| POST | `/proposals` | debits 1 PP atomically; `PP_INSUFFICIENT`, `DUPLICATE_EXACT` (auto-reject, refunded) |
-| GET | `/me/polls` | approved only, with respondent counts |
-| GET/PUT | `/staff/daily-calendar/{date}` | Admin/Owner |
-| POST | `/staff/daily/{date}/emergency-replace` | Admin/Owner; replacement must be queued 0-response |
-| POST | `/staff/proposals/{id}/decision` | approve / reject(refund flag) / edit / request-revision |
+| Method     | Path                  | Notes / errors                                                                                                                      |
+| ---------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| POST       | `/auth/invite/check`  | `{code}` → `{valid}`; brute-force limited; does not consume                                                                         |
+| POST       | `/auth/register`      | `{code, email, password, username}`; atomic consume on success; `INVITE_INVALID`, `USERNAME_TAKEN` (incl. reserved), `EMAIL_IN_USE` |
+| POST       | `/auth/verify-email`  | token                                                                                                                               |
+| POST       | `/auth/login`         | interactive sign-in; **reactivates deactivated account**                                                                            |
+| POST       | `/auth/refresh`       | background refresh; **never reactivates**                                                                                           |
+| POST       | `/auth/logout`        |                                                                                                                                     |
+| POST       | `/account/deactivate` | starts new one-year period                                                                                                          |
+| PATCH      | `/me/profile`         | display name (168 h rule), bio                                                                                                      |
+| PUT/DELETE | `/me/avatar`          | upload → async processing; DELETE doesn't reset cooldown                                                                            |
 
-## Surveys & PP (M3)
-| GET | `/daily` | today's assignments, progress n/11, PP awarded?, Daily Poll or `DAILY_POLL_UNAVAILABLE` |
-| POST | `/daily/assignments/{slot}/response` | `{text}` → `{status:"accepted", message:"Thank you for your response"}`; `ALREADY_ANSWERED`, `DAY_ROLLED_OVER`, `RESPONSE_REJECTED_QUALITY` |
-| GET | `/me/pp` | balance + ledger (own) |
+## Polls & proposals (M2) — implemented
 
-## Guessing (M4)
-| POST | `/games/solo` | starts; `DAILY_LIMIT_REACHED`, `NO_ELIGIBLE_POLL`, `ACTIVE_GAME_EXISTS`, `GUESSING_SUSPENDED` |
-| POST | `/games/{id}/guesses` | `{text, clientRequestId}` → `{result: correct|incorrect|already_guessed, percent?, cumulative, strikes, remaining, outcome?}` |
-| POST | `/games/{id}/leave` | confirmation required |
+| Method     | Path                                               | Who              | Notes / errors                                                                                                    |
+| ---------- | -------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| POST       | `/proposals`                                       | member           | `Idempotency-Key` header; `{text, visibility}`; debits 1 PP; `PP_INSUFFICIENT`, auto `duplicate_exact` (refunded) |
+| GET        | `/me/polls`                                        | member           | approved only, with respondent counts                                                                             |
+| GET        | `/me/pp`                                           | member           | balance + last 50 ledger entries                                                                                  |
+| PUT        | `/me/settings/poll-attribution`                    | member           | `{hideNameOnAllPolls}`                                                                                            |
+| GET/POST   | `/me/notifications`, `/me/notifications/{id}/read` | member           |                                                                                                                   |
+| GET        | `/daily/poll`                                      | member           | today's Daily Poll or `available:false`                                                                           |
+| GET        | `/staff/proposals?route=`                          | moderator+       | pending queue (normal/sensitive/similarity), shows creator                                                        |
+| POST       | `/staff/proposals/{id}/decision`                   | moderator+       | approve (staff fix wording if needed) / reject(reason); never sent back to the submitter                          |
+| POST       | `/staff/proposals/{id}/route`                      | moderator+       | move between queues                                                                                               |
+| POST       | `/staff/proposals/{id}/refund-correction`          | super_moderator+ | grant / reverse                                                                                                   |
+| PATCH      | `/staff/polls/{id}`                                | moderator+       | wording, queued polls only                                                                                        |
+| POST       | `/staff/polls`                                     | admin+           | seed a poll without PP                                                                                            |
+| GET        | `/staff/daily`                                     | admin+           | queue, schedule, recent features, exceptions                                                                      |
+| PUT/DELETE | `/staff/daily/calendar/{date}`                     | admin+           | future dates only                                                                                                 |
+| POST       | `/staff/daily/emergency-replace`                   | admin+           | `{reason, replacementPollId?}`                                                                                    |
 
-## Multiplayer WebSocket (M5)
-Client → server: `queue.join{mode}`, `queue.cancel`, `room.create`, `room.invite`, `match.guess`, `match.pause.request`, `vote.cast{roundId, value}`, `ready`, `nevermind`, `leave.confirm`, `chat.pause.send`.
-Server → client (player channel): `match.state{stateVersion,…}`, `guess.result` (own words only), `opponent.guess{playerId, n, result, percent}` (no words), `vote.opened/closed`, `timer{kind, endsAt}`, `match.ended{outcome}`.
-Server → spectator channel: same as opponent view; never words, never duplicates, never answer list.
-Every event carries `stateVersion`; clients resync via `match.snapshot` on reconnect.
+## Surveys & PP (M3) — implemented
+
+| Method  | Path                                 | Notes / errors                                                                                                                                                                                                   |
+| ------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET     | `/daily`                             | Daily Poll (or unavailable), 10 assigned surveys, progress `{completed, target: 11, possible}`, `ppAwarded`, announcement + reminder flags                                                                       |
+| POST    | `/daily/poll/response`               | `{pollId, text}` → `{status:"accepted", message:"Thank you for your response", alreadyAnswered, countsForProgress, progress, ppAwarded}`; `RESPONSE_REJECTED` (422), `DAY_ROLLED_OVER`, `DAILY_POLL_UNAVAILABLE` |
+| POST    | `/daily/assignments/{slot}/response` | same body/result; `ALREADY_ANSWERED`, `POLL_UNAVAILABLE`, `DAY_ROLLED_OVER`; 60/min per person                                                                                                                   |
+| POST    | `/daily/announcement/seen`           | hides today's announcement                                                                                                                                                                                       |
+| GET     | `/me/streaks`                        | answering + guessing current/longest (own)                                                                                                                                                                       |
+| GET/PUT | `/me/settings/notifications`         | `{dailyPollAnnouncement, answeringReminder, guessingReminder}`                                                                                                                                                   |
+
+## Guessing (M4) — implemented
+
+| Method | Path                                    | Notes / errors                                                                                                                  |
+| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/games/status`                         | games used/left today, active game id                                                                                           |
+| POST   | `/games/mystery`                        | Mystery Challenge: random unplayed poll + achievable objective (`objective.type`, `objective.description`); same errors as solo |
+| POST   | `/games/solo`                           | server picks the poll; `ACTIVE_GAME_EXISTS`, `DAILY_LIMIT_REACHED`, `NO_ELIGIBLE_POLL`                                          |
+| GET    | `/games/{id}`                           | question, found answers + %, score, strikes, remaining, outcome, own guesses; never the full list                               |
+| POST   | `/games/{id}/guesses`                   | `{text, clientRequestId}` → `correct` (answer, percent) / `incorrect` / `already_guessed` + game; `GAME_OVER`, `INVALID_GUESS`  |
+| GET    | `/me/stats`                             | solo record, accuracy, Rarest Correct Guess, record-holder badge                                                                |
+| GET    | `/records/rarest-guess`                 | sitewide record percent + holders (usernames)                                                                                   |
+| GET    | `/staff/polls/{id}/answer-keys`         | moderator+: normalized keys + counts + groups (no raw text)                                                                     |
+| POST   | `/staff/polls/{id}/answer-groups/merge` | moderator+: `{keys, into}`                                                                                                      |
+
+## Multiplayer (M5a) — implemented
+
+| Method          | Path                        | Notes / errors                                                                                                                                                                   |
+| --------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST            | `/matches/rooms`            | `{mode: h2h/teams/ffa, format: classic/speed}` → lobby with room code; `ALREADY_BUSY`                                                                                            |
+| POST            | `/matches/rooms/join`       | `{code}`; `ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_BUSY`                                                                                                                          |
+| POST            | `/matches/{id}/team`        | Teams lobby: `{team: 0/1}`; `TEAM_FULL`                                                                                                                                          |
+| POST            | `/matches/{id}/start`       | host only; `WRONG_PLAYER_COUNT`, `PLAYER_UNAVAILABLE`, `NO_SHARED_POLL`                                                                                                          |
+| POST            | `/matches/{id}/leave-lobby` | lobby only; host passes to the next player                                                                                                                                       |
+| POST/DELETE/GET | `/matchmaking/queue`        | join `{mode, format, bestOf?}` / cancel / status (`matchId` once matched); `DAILY_LIMIT_REACHED`                                                                                 |
+| GET             | `/matches/current`          | your active match or lobby id                                                                                                                                                    |
+| GET             | `/matches/{id}`             | per-viewer view: series (best-of, wins, rounds), question (hidden until a round starts), clock, turn, sides (own side with words; others numbered results only), places/outcomes |
+| POST            | `/matches/{id}/guesses`     | `{text, clientRequestId}`; `NOT_YOUR_TURN`, `SIDE_FINISHED`, `MATCH_NOT_ACTIVE`                                                                                                  |
+| WS              | `/ws`                       | send `{subscribe: matchId}`; receive `{type: match.updated, matchId}`, `match.started`, `match.ended` — ids only                                                                 |
 
 ## Social & moderation (M6) — to be detailed at M6 start
+
 Profiles, relationships, blocks, DMs, groups, reports (`POST /reports` → always `{message:"Report submitted"}`), staff cases, appeals, leaderboards (`GET /leaderboards/{solo|multi}/{week|month|all}`).

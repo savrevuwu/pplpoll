@@ -5,38 +5,39 @@ Legend: ✅ allowed · ❌ denied · 🔸 conditional (see note) · Self = own r
 
 Ranks: Owner > Admin > Super Moderator > Moderator > Trainee > Member > Public (signed out).
 
-| Action | Public | Member | Trainee | Moderator | Super Mod | Admin | Owner |
-|---|---|---|---|---|---|---|---|
-| Register with invite code | ✅ | — | — | — | — | — | — |
-| Create / revoke / monitor invite codes | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| View profile | ❌ | 🔸¹ | 🔸¹ | ✅² | ✅² | ✅² | ✅ |
-| Edit own profile / display name / photo | ❌ | Self³ | Self³ | Self³ | Self³ | Self³ | Self³ |
-| Answer Daily Poll / assigned surveys | ❌ | ✅⁴ | ✅⁴ | ✅⁴ | ✅⁴ | ✅⁴ | ✅⁴ |
-| Play solo / multiplayer | ❌ | ✅⁵ | ✅⁵ | ✅⁵ | ✅⁵ | ✅⁵ | ✅⁵ |
-| Choose a game poll | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Spectate | ❌ | 🔸⁶ | 🔸⁶ | 🔸⁶ | 🔸⁶ | 🔸⁶ | 🔸⁶ |
-| Submit poll proposal (1 PP) | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Review proposals (approve/reject/edit/refund) | ❌ | ❌ | 🔸⁷ | ✅ | ✅ | ✅ | ✅ |
-| Correct a mistaken refund | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Edit Daily Poll calendar | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Emergency Daily Poll replacement | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Read raw survey responses (quality review) | ❌ | ❌ | ❌ | ✅⁸ | ✅⁸ | ✅⁸ | ✅⁸ |
-| Remove prohibited response / content | ❌ | ❌ | 🔸⁷ | ✅ | ✅ | ✅ | ✅ |
-| See full answer distribution | ❌ | ❌ | ❌ | ✅⁸ | ✅⁸ | ✅⁸ | ✅⁸ |
-| Identify anonymous poll creator | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| File report | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | — (Owner cannot be reported) |
-| Handle reports / cases | ❌ | ❌ | 🔸⁷ | ✅⁹ | ✅⁹ | ✅⁹ | ✅ |
-| Freeze / ban members | ❌ | ❌ | ❌ | ✅⁹ | ✅⁹ | ✅⁹ | ✅ |
-| Action against staff | ❌ | ❌ | ❌ | 🔸¹⁰ | 🔸¹⁰ | 🔸¹⁰ | ✅ |
-| Promote / demote staff | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Read Staff Records | ❌ | ❌ | ❌ | 🔸¹⁰ | 🔸¹⁰ | ✅¹¹ | ✅ |
-| Export Staff Records | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Read sensitive-access audit | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Access DMs as evidence | ❌ | ❌ | ❌ | 🔸¹² | 🔸¹² | 🔸¹² | 🔸¹² |
-| Decide appeal | ❌ | ❌ | ❌ | 🔸¹³ | 🔸¹³ | 🔸¹³ | ✅ |
-| Open cheating investigation (suspends guessing) | ❌ | ❌ | ❌ | ✅⁹ | ✅⁹ | ✅⁹ | ✅ |
+| Action                                          | Public | Member | Trainee | Moderator | Super Mod | Admin | Owner                        |
+| ----------------------------------------------- | ------ | ------ | ------- | --------- | --------- | ----- | ---------------------------- |
+| Register with invite code                       | ✅     | —      | —       | —         | —         | —     | —                            |
+| Create / revoke / monitor invite codes          | ❌     | ❌     | ❌      | ❌        | ❌        | ❌    | ✅                           |
+| View profile                                    | ❌     | 🔸¹    | 🔸¹     | ✅²       | ✅²       | ✅²   | ✅                           |
+| Edit own profile / display name / photo         | ❌     | Self³  | Self³   | Self³     | Self³     | Self³ | Self³                        |
+| Answer Daily Poll / assigned surveys            | ❌     | ✅⁴    | ✅⁴     | ✅⁴       | ✅⁴       | ✅⁴   | ✅⁴                          |
+| Play solo / multiplayer                         | ❌     | ✅⁵    | ✅⁵     | ✅⁵       | ✅⁵       | ✅⁵   | ✅⁵                          |
+| Choose a game poll                              | ❌     | ❌     | ❌      | ❌        | ❌        | ❌    | ❌                           |
+| Spectate                                        | ❌     | 🔸⁶    | 🔸⁶     | 🔸⁶       | 🔸⁶       | 🔸⁶   | 🔸⁶                          |
+| Submit poll proposal (1 PP)                     | ❌     | ✅     | ✅      | ✅        | ✅        | ✅    | ✅                           |
+| Review proposals (approve/reject/edit/refund)   | ❌     | ❌     | 🔸⁷     | ✅        | ✅        | ✅    | ✅                           |
+| Correct a mistaken refund                       | ❌     | ❌     | ❌      | ❌        | ✅        | ✅    | ✅                           |
+| Edit Daily Poll calendar                        | ❌     | ❌     | ❌      | ❌        | ❌        | ✅    | ✅                           |
+| Emergency Daily Poll replacement                | ❌     | ❌     | ❌      | ❌        | ❌        | ✅    | ✅                           |
+| Read raw survey responses (quality review)      | ❌     | ❌     | ❌      | ✅⁸       | ✅⁸       | ✅⁸   | ✅⁸                          |
+| Remove prohibited response / content            | ❌     | ❌     | 🔸⁷     | ✅        | ✅        | ✅    | ✅                           |
+| See full answer distribution                    | ❌     | ❌     | ❌      | ✅⁸       | ✅⁸       | ✅⁸   | ✅⁸                          |
+| Identify anonymous poll creator                 | ❌     | ❌     | ✅      | ✅        | ✅        | ✅    | ✅                           |
+| File report                                     | ❌     | ✅     | ✅      | ✅        | ✅        | ✅    | — (Owner cannot be reported) |
+| Handle reports / cases                          | ❌     | ❌     | 🔸⁷     | ✅⁹       | ✅⁹       | ✅⁹   | ✅                           |
+| Freeze / ban members                            | ❌     | ❌     | ❌      | ✅⁹       | ✅⁹       | ✅⁹   | ✅                           |
+| Action against staff                            | ❌     | ❌     | ❌      | 🔸¹⁰      | 🔸¹⁰      | 🔸¹⁰  | ✅                           |
+| Promote / demote staff                          | ❌     | ❌     | ❌      | ❌        | ❌        | ❌    | ✅                           |
+| Read Staff Records                              | ❌     | ❌     | ❌      | 🔸¹⁰      | 🔸¹⁰      | ✅¹¹  | ✅                           |
+| Export Staff Records                            | ❌     | ❌     | ❌      | ❌        | ❌        | ❌    | ❌                           |
+| Read sensitive-access audit                     | ❌     | ❌     | ❌      | ❌        | ❌        | ❌    | ✅                           |
+| Access DMs as evidence                          | ❌     | ❌     | ❌      | 🔸¹²      | 🔸¹²      | 🔸¹²  | 🔸¹²                         |
+| Decide appeal                                   | ❌     | ❌     | ❌      | 🔸¹³      | 🔸¹³      | 🔸¹³  | ✅                           |
+| Open cheating investigation (suspends guessing) | ❌     | ❌     | ❌      | ✅⁹       | ✅⁹       | ✅⁹   | ✅                           |
 
 Notes
+
 1. Subject to target's privacy settings and blocks (blocked users get 404-equivalent, never a "blocked" hint). Hidden if target is frozen/banned/deactivated.
 2. Staff view within role for moderation; access to hidden content is audit-logged.
 3. Display name ≥168 h between voluntary changes; photo upload ≥168 h after last successful upload; staff-required corrections exempt.
