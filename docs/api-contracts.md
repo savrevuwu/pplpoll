@@ -49,17 +49,16 @@ Conventions: JSON over HTTPS; session cookie + `X-CSRF-Token` on mutations; `Ide
 
 ## Guessing (M4) — implemented
 
-| Method | Path                                    | Notes / errors                                                                                                                                    |
-| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/games/status`                         | games used/left today, active game id                                                                                                             |
-| POST   | `/games/solo`                           | server picks the poll; `ACTIVE_GAME_EXISTS`, `DAILY_LIMIT_REACHED`, `NO_ELIGIBLE_POLL`                                                            |
-| GET    | `/games/{id}`                           | question, found answers + %, score, strikes, remaining, outcome, own guesses; never the full list                                                 |
-| POST   | `/games/{id}/guesses`                   | `{text, clientRequestId}` → `correct` (answer, percent) / `incorrect` / `already_guessed` + game; `GAME_OVER`, `INVALID_GUESS`                    |
-| POST   | `/games/{id}/leave`                     | `{confirm:true}`; only before the first guess → released (no charge); after that `GAME_IN_PROGRESS` (resume via `/games/status` → `activeGameId`) |
-| GET    | `/me/stats`                             | solo record, accuracy, Rarest Correct Guess, record-holder badge                                                                                  |
-| GET    | `/records/rarest-guess`                 | sitewide record percent + holders (usernames)                                                                                                     |
-| GET    | `/staff/polls/{id}/answer-keys`         | moderator+: normalized keys + counts + groups (no raw text)                                                                                       |
-| POST   | `/staff/polls/{id}/answer-groups/merge` | moderator+: `{keys, into}`                                                                                                                        |
+| Method | Path                                    | Notes / errors                                                                                                                 |
+| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/games/status`                         | games used/left today, active game id                                                                                          |
+| POST   | `/games/solo`                           | server picks the poll; `ACTIVE_GAME_EXISTS`, `DAILY_LIMIT_REACHED`, `NO_ELIGIBLE_POLL`                                         |
+| GET    | `/games/{id}`                           | question, found answers + %, score, strikes, remaining, outcome, own guesses; never the full list                              |
+| POST   | `/games/{id}/guesses`                   | `{text, clientRequestId}` → `correct` (answer, percent) / `incorrect` / `already_guessed` + game; `GAME_OVER`, `INVALID_GUESS` |
+| GET    | `/me/stats`                             | solo record, accuracy, Rarest Correct Guess, record-holder badge                                                               |
+| GET    | `/records/rarest-guess`                 | sitewide record percent + holders (usernames)                                                                                  |
+| GET    | `/staff/polls/{id}/answer-keys`         | moderator+: normalized keys + counts + groups (no raw text)                                                                    |
+| POST   | `/staff/polls/{id}/answer-groups/merge` | moderator+: `{keys, into}`                                                                                                     |
 
 ## Multiplayer WebSocket (M5)
 

@@ -65,13 +65,6 @@ const guess = (s: Session, gameId: string, text: string, clientRequestId = rando
     headers: as(s),
     payload: { text, clientRequestId },
   });
-const leave = (s: Session, gameId: string) =>
-  h.app.inject({
-    method: 'POST',
-    url: `/games/${gameId}/leave`,
-    headers: as(s),
-    payload: { confirm: true },
-  });
 /** Uses one daily game: three wrong guesses end it as a loss. */
 async function burnGame(s: Session) {
   const g = (await start(s)).json();
@@ -284,12 +277,12 @@ describe('solo game (§5, §6)', () => {
     ).toBe(true);
   });
 
-  it('opening a game does not mark it played or charge; leaving before a guess releases it', async () => {
-    const p = await pollWithAnswers(PURSE);
+  it('opening a game does not mark it played or charge; there is no leave option (S1)', async () => {
+    await pollWithAnswers(PURSE);
+    await pollWithAnswers(PURSE);
     await snapshots();
     const u = await member();
     const g = (await start(u)).json();
-    await leave(u, g.gameId);
     expect((await status(u)).gamesUsed).toBe(0);
     expect(
       await h.db
@@ -298,14 +291,18 @@ describe('solo game (§5, §6)', () => {
         .where('user_id', '=', u.userId)
         .execute(),
     ).toHaveLength(0);
-    const again = (await start(u)).json();
-    expect(again.gameId).not.toBe(g.gameId);
-    const pollOf = await h.db
-      .selectFrom('games')
-      .select('poll_id')
-      .where('id', '=', again.gameId)
-      .executeTakeFirstOrThrow();
-    expect(pollOf.poll_id).toBe(p); // still eligible: never played
+    const leave = await h.app.inject({
+      method: 'POST',
+      url: `/games/${g.gameId}/leave`,
+      headers: as(u),
+      payload: { confirm: true },
+    });
+    expect(leave.statusCode).toBe(404);
+    // Starting again returns the same saved game instead of a new one.
+    expect((await start(u)).json().error).toMatchObject({
+      code: 'ACTIVE_GAME_EXISTS',
+      gameId: g.gameId,
+    });
   });
 
   it('first accepted guess charges once and marks played; played polls are skipped next time', async () => {
@@ -489,8 +486,8 @@ describe('Rarest Correct Guess (update §8, §9)', () => {
     await snapshots();
     const a = await member();
     const b = await member();
-    let g = (await start(a)).json();
-    // a plays whichever poll; force each player onto a specific poll by playing both
+    let g: { gameId: string };
+    // Each player plays both polls, guessing the rare answer each time.
     const playUntilRare = async (u: Session, target: string) => {
       for (let i = 0; i < 2; i++) {
         g = (await start(u)).json();
@@ -500,7 +497,6 @@ describe('Rarest Correct Guess (update §8, §9)', () => {
         await guess(u, g.gameId, 'phone');
       }
     };
-    await leave(a, g.gameId);
     await playUntilRare(a, 'mints');
     const before = (await h.app.inject({ method: 'GET', url: '/me/stats', headers: as(a) })).json();
     expect(before.rarestCorrectGuess).toBe('4.00%');
@@ -511,16 +507,13 @@ describe('Rarest Correct Guess (update §8, §9)', () => {
     expect(as2).toMatchObject({ rarestCorrectGuess: '4.00%', rarestGuessRecordHolder: false });
   });
 
-  it('after guessing, a solo game cannot be left: it is saved and resumes later, even the next day (S1)', async () => {
+  it('a solo game is saved and resumes later, even days later (S1)', async () => {
     await pollWithAnswers(PURSE);
     await pollWithAnswers(PURSE);
     await snapshots();
     const u = await member();
     const g = (await start(u)).json();
     await guess(u, g.gameId, 'mints');
-    const left = await leave(u, g.gameId);
-    expect(left.statusCode).toBe(409);
-    expect(left.json().error).toMatchObject({ code: 'GAME_IN_PROGRESS', gameId: g.gameId });
     const other = await start(u);
     expect(other.json().error).toMatchObject({ code: 'ACTIVE_GAME_EXISTS', gameId: g.gameId });
     expect((await status(u)).activeGameId).toBe(g.gameId);

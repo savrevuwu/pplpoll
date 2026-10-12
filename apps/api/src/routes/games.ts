@@ -43,12 +43,6 @@ export function registerGameRoutes(app: FastifyInstance, deps: AppDeps): void {
     return solo.submitGuess(deps, currentUser(req).userId, id, body.text, body.clientRequestId);
   });
 
-  app.post('/games/:id/leave', user, async (req) => {
-    const { id } = parse(IdParam, req.params);
-    parse(z.strictObject({ confirm: z.literal(true) }), req.body);
-    return solo.leaveGame(deps, currentUser(req).userId, id);
-  });
-
   app.get('/me/stats', user, async (req) => playerStats(deps.db, currentUser(req).userId));
 
   app.get('/records/rarest-guess', user, async () => {

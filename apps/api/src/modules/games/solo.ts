@@ -109,7 +109,7 @@ export async function startSolo(deps: AppDeps, userId: string) {
         .where('active', '=', true)
         .executeTakeFirst();
       if (active)
-        throw new AppError(409, 'ACTIVE_GAME_EXISTS', 'Finish or leave your current game first', {
+        throw new AppError(409, 'ACTIVE_GAME_EXISTS', 'Finish your current game first', {
           gameId: active.game_id,
         });
       if ((await chargedOn(trx, userId, date)) >= DAILY_GAME_LIMIT) throw dailyLimit();
@@ -149,7 +149,7 @@ export async function startSolo(deps: AppDeps, userId: string) {
     return getGame(deps, userId, gameId);
   } catch (err) {
     if (isUniqueViolation(err, 'game_participations_one_active')) {
-      throw new AppError(409, 'ACTIVE_GAME_EXISTS', 'Finish or leave your current game first');
+      throw new AppError(409, 'ACTIVE_GAME_EXISTS', 'Finish your current game first');
     }
     throw err;
   }
@@ -463,35 +463,6 @@ function toView(
     answer: snap.labels[groupId]!,
     percent: formatPercent(share(snap.distribution[groupId]!, snap.respondents)),
   };
-}
-
-/**
- * Leaving is only possible before the first accepted guess: the reservation is released with no
- * charge. After that a solo game can't be abandoned — the player comes back to it later and picks
- * up where they left off (owner decision S1).
- */
-export async function leaveGame(deps: AppDeps, userId: string, gameId: string) {
-  const now = deps.clock();
-  await deps.db.transaction().execute(async (trx) => {
-    const game = await loadGame(trx, userId, gameId, true);
-    if (game.state !== 'active') return;
-    const part = await trx
-      .selectFrom('game_participations')
-      .select('first_guess_at')
-      .where('game_id', '=', gameId)
-      .where('user_id', '=', userId)
-      .executeTakeFirstOrThrow();
-    if (part.first_guess_at) {
-      throw new AppError(
-        409,
-        'GAME_IN_PROGRESS',
-        'This game is saved. Come back any time to finish it',
-        { gameId },
-      );
-    }
-    await endParticipation(trx, gameId, userId, 'released', now);
-  });
-  return getGame(deps, userId, gameId);
 }
 
 /**
