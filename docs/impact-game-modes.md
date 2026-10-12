@@ -40,7 +40,7 @@ Status: assessment done; **pure scoring logic implemented (Batch A)**; everythin
 
 ## 4. Contradictions and open questions (owner decisions needed)
 
-Each has a recommended answer. Nothing below is built until answered.
+**Owner accepted these recommendations on 2026-10-12 ("okay, do whatever is next").** They can still be changed before the matching batch is built.
 
 | ID      | Conflict / gap                                                                                                                                                                                      | Recommendation                                                                                                                                                                                                                                                                      |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

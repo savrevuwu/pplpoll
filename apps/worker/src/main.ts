@@ -4,6 +4,7 @@ import {
   createLogger,
   dispatchOutbox,
   loadSecrets,
+  publishDaily,
   runFinalDeletions,
   sendDeactivationWarnings,
   type EmailTransport,
@@ -48,6 +49,15 @@ await boss.schedule('email.dispatch', every);
 await boss.work('email.dispatch', async () => {
   const sent = await dispatchOutbox(db, crypto, transport, new Date());
   if (sent) logger.info({ sent }, 'email outbox dispatched');
+});
+
+// Daily Poll publication at 12:00 AM America/New_York (spec §2.4). Checked every minute so a
+// restart or delay catches up; repeated runs are no-ops once today's poll is published.
+await boss.createQueue('daily.publish');
+await boss.schedule('daily.publish', every);
+await boss.work('daily.publish', async () => {
+  const r = await publishDaily({ db }, new Date());
+  if (r.status !== 'already_published') logger.info({ status: r.status }, 'daily poll publication');
 });
 
 logger.info('worker started');

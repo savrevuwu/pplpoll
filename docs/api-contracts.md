@@ -16,15 +16,25 @@ Conventions: JSON over HTTPS; session cookie + `X-CSRF-Token` on mutations; `Ide
 | PATCH      | `/me/profile`         | display name (168 h rule), bio                                                                                                      |
 | PUT/DELETE | `/me/avatar`          | upload → async processing; DELETE doesn't reset cooldown                                                                            |
 
-## Polls & proposals (M2)
+## Polls & proposals (M2) — implemented
 
-| Method  | Path                                    | Notes / errors                                                                       |
-| ------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
-| POST    | `/proposals`                            | debits 1 PP atomically; `PP_INSUFFICIENT`, `DUPLICATE_EXACT` (auto-reject, refunded) |
-| GET     | `/me/polls`                             | approved only, with respondent counts                                                |
-| GET/PUT | `/staff/daily-calendar/{date}`          | Admin/Owner                                                                          |
-| POST    | `/staff/daily/{date}/emergency-replace` | Admin/Owner; replacement must be queued 0-response                                   |
-| POST    | `/staff/proposals/{id}/decision`        | approve / reject(refund flag) / edit / request-revision                              |
+| Method     | Path                                               | Who              | Notes / errors                                                                                                    |
+| ---------- | -------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| POST       | `/proposals`                                       | member           | `Idempotency-Key` header; `{text, visibility}`; debits 1 PP; `PP_INSUFFICIENT`, auto `duplicate_exact` (refunded) |
+| GET        | `/me/polls`                                        | member           | approved only, with respondent counts                                                                             |
+| GET        | `/me/pp`                                           | member           | balance + last 50 ledger entries                                                                                  |
+| PUT        | `/me/settings/poll-attribution`                    | member           | `{hideNameOnAllPolls}`                                                                                            |
+| GET/POST   | `/me/notifications`, `/me/notifications/{id}/read` | member           |                                                                                                                   |
+| GET        | `/daily/poll`                                      | member           | today's Daily Poll or `available:false`                                                                           |
+| GET        | `/staff/proposals?route=`                          | moderator+       | pending queue (normal/sensitive/similarity), shows creator                                                        |
+| POST       | `/staff/proposals/{id}/decision`                   | moderator+       | approve (optional wording fix) / reject(reason) / request_revision(note)                                          |
+| POST       | `/staff/proposals/{id}/route`                      | moderator+       | move between queues                                                                                               |
+| POST       | `/staff/proposals/{id}/refund-correction`          | super_moderator+ | grant / reverse                                                                                                   |
+| PATCH      | `/staff/polls/{id}`                                | moderator+       | wording, queued polls only                                                                                        |
+| POST       | `/staff/polls`                                     | admin+           | seed a poll without PP                                                                                            |
+| GET        | `/staff/daily`                                     | admin+           | queue, schedule, recent features, exceptions                                                                      |
+| PUT/DELETE | `/staff/daily/calendar/{date}`                     | admin+           | future dates only                                                                                                 |
+| POST       | `/staff/daily/emergency-replace`                   | admin+           | `{reason, replacementPollId?}`                                                                                    |
 
 ## Surveys & PP (M3)
 

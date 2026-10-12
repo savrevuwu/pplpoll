@@ -11,6 +11,14 @@ type NullableTimestamp = ColumnType<
 export type Role = 'member' | 'trainee' | 'moderator' | 'super_moderator' | 'admin' | 'owner';
 export type AccountState = 'active' | 'frozen' | 'banned' | 'deactivated' | 'deleted';
 
+export type PpKind = 'daily_award' | 'proposal_debit' | 'proposal_refund' | 'refund_reversal';
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'revision_requested';
+export type ProposalRoute = 'normal' | 'sensitive' | 'similarity';
+export type Visibility = 'public' | 'anonymous';
+export type PollStatus = 'queued' | 'live_daily' | 'survey' | 'removed';
+type DateOnly = ColumnType<string, string, string>;
+type Json = ColumnType<unknown, string | undefined, string>;
+
 export interface Database {
   'audit.events': {
     id: Generated<string>;
@@ -25,6 +33,7 @@ export interface Database {
     id: Generated<string>;
     role: ColumnType<Role, Role | undefined, Role>;
     state: ColumnType<AccountState, AccountState | undefined, AccountState>;
+    hide_name_on_polls: Generated<boolean>;
     created_at: Generated<Date>;
   };
   username_reservations: {
@@ -109,7 +118,90 @@ export interface Database {
     created_at: Timestamp;
     sent_at: NullableTimestamp;
   };
+  pp_accounts: {
+    user_id: string;
+    balance: Generated<number>;
+  };
+  pp_ledger: {
+    id: Generated<string>;
+    user_id: string;
+    delta: number;
+    kind: PpKind;
+    ref_id: string | null;
+    et_date: DateOnly | null;
+    actor_user_id: string | null;
+    created_at: Timestamp;
+  };
+  poll_proposals: {
+    id: Generated<string>;
+    creator_user_id: string;
+    text: string;
+    exact_key: string;
+    visibility: Visibility;
+    status: ColumnType<ProposalStatus, ProposalStatus | undefined, ProposalStatus>;
+    route: ProposalRoute;
+    idempotency_key: string;
+    similar_to: Json;
+    refunded: Generated<boolean>;
+    decision_reason: string | null;
+    decided_by: string | null;
+    decided_at: NullableTimestamp;
+    created_at: Timestamp;
+  };
+  polls: {
+    id: Generated<string>;
+    proposal_id: string | null;
+    text: string;
+    exact_key: string;
+    creator_user_id: string | null;
+    creator_visibility: Visibility;
+    status: ColumnType<PollStatus, PollStatus | undefined, PollStatus>;
+    debut_et_date: ColumnType<string | null, string | null | undefined, string | null>;
+    response_count: Generated<number>;
+    approved_by: string | null;
+    approved_at: Timestamp;
+    removed_at: NullableTimestamp;
+    removed_reason: string | null;
+  };
+  daily_schedule: {
+    et_date: DateOnly;
+    poll_id: string;
+    scheduled_by: string;
+    scheduled_at: Timestamp;
+  };
+  daily_features: {
+    id: Generated<string>;
+    et_date: DateOnly;
+    poll_id: string;
+    kind: 'primary' | 'emergency_replacement';
+    source: 'scheduled' | 'auto' | 'staff_pick';
+    replaces_feature_id: string | null;
+    active: Generated<boolean>;
+    created_by: string | null;
+    reason: string | null;
+    started_at: Timestamp;
+    ended_at: NullableTimestamp;
+  };
+  daily_poll_exceptions: {
+    id: Generated<string>;
+    et_date: DateOnly;
+    kind: 'queue_empty' | 'emergency_removed' | 'emergency_no_replacement';
+    detail: Json;
+    created_at: Timestamp;
+  };
+  notifications: {
+    id: Generated<string>;
+    user_id: string;
+    kind: string;
+    dedupe_key: string | null;
+    payload: Json;
+    created_at: Timestamp;
+    read_at: NullableTimestamp;
+  };
 }
+
+// Return SQL `date` columns as 'YYYY-MM-DD' strings (America/New_York business dates), not JS Dates.
+pg.types.setTypeParser(pg.types.builtins.DATE, (v) => v);
 
 export function createDb(connectionString: string): Kysely<Database> {
   const pool = new pg.Pool({ connectionString, max: 20 });

@@ -62,6 +62,20 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - Display-name removal counts as a change for the 168-hour timer. Staff-required corrections (exempt from the timer) arrive with moderation in M6.
 - Brute-force protection: per-client rate limits on invite check, register, verify, login. Per-account lockout to be added with M7 security review.
 
+### 1.6 Milestone 2 engineering choices
+
+- **"Request revision" (spec §9) is built as:** the proposal is closed, the 1 PP is refunded, and the creator gets the staff note so they can submit a new, revised proposal. This keeps "no user editing after submission". _(Owner question R1 — confirm or change.)_
+- Exact duplicates are checked against every existing poll and every pending proposal; auto-rejected and refunded. Similar questions (pg_trgm similarity ≥ 0.6) go to the similarity queue with the matches listed for staff.
+- Sensitive-queue routing uses a short editable word list (`packages/domain/src/polls.ts`). It only picks a queue; staff decide and can move proposals.
+- Rejection reasons decide refunds server-side: good-faith (duplicate, quality, unsuitable for gameplay, other) refund; prohibited/malicious/abusive/spam do not. Super Moderators and above can correct a refund.
+- Moderators and above review proposals; trainees do not yet (trainee-with-supervisor flow comes with M6 staff wings).
+- Proposal submission needs an `Idempotency-Key`; at most 10 submissions per hour per person.
+- Staff may correct wording only while a poll is still queued with zero responses; after its debut, rewording means a new poll.
+- Owner/Admin-seeded polls (decision Q2) default to anonymous attribution.
+- The publish job runs every minute and is a no-op once today is published, so a late or restarted worker catches up. If the worker starts mid-day with nothing published yet, it publishes for that day.
+- Removing the active Daily Poll without a replacement leaves the day "unavailable"; the midnight job does not fill it later that day.
+- The per-user daily in-app Daily Poll announcement and its setting arrive with M3 (answering).
+
 ## 2. Architecture decision records
 
 | ADR     | Decision                                                                                                        | Status   |

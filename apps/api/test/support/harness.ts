@@ -161,3 +161,38 @@ export async function signUp(
   if (v.statusCode !== 200) throw new Error(`verify failed ${v.body}`);
   return { ...user, ...(await login(h, user.email, user.password)) };
 }
+
+/** Test-only: give a user Poll Points directly (daily awards arrive in M3). */
+export async function grantPp(h: Harness, userId: string, amount: number) {
+  await h.db
+    .insertInto('pp_accounts')
+    .values({ user_id: userId, balance: amount })
+    .onConflict((oc) =>
+      oc
+        .column('user_id')
+        .doUpdateSet((eb) => ({ balance: eb('pp_accounts.balance', '+', amount) })),
+    )
+    .execute();
+}
+
+export async function setRole(h: Harness, owner: Session, userId: string, role: string) {
+  const r = await h.app.inject({
+    method: 'PUT',
+    url: `/staff/users/${userId}/role`,
+    headers: as(owner),
+    payload: { role },
+  });
+  if (r.statusCode !== 200) throw new Error(`role change failed ${r.body}`);
+}
+
+export async function balanceOf(h: Harness, userId: string) {
+  return (
+    (
+      await h.db
+        .selectFrom('pp_accounts')
+        .select('balance')
+        .where('user_id', '=', userId)
+        .executeTakeFirst()
+    )?.balance ?? 0
+  );
+}
