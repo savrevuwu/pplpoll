@@ -395,7 +395,12 @@ export async function getPublicProfile(deps: AppDeps, username: string) {
   return deps.db
     .selectFrom('profiles as p')
     .innerJoin('users as u', 'u.id', 'p.user_id')
-    .select(['p.username', 'p.display_name as displayName', 'u.created_at as joinedAt'])
+    .select([
+      'u.id as userId',
+      'p.username',
+      'p.display_name as displayName',
+      'u.created_at as joinedAt',
+    ])
     .where((eb) => eb(eb.fn('lower', ['p.username']), '=', usernameKey(username)))
     .where('u.state', '=', 'active')
     .executeTakeFirst();

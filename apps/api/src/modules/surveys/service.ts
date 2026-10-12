@@ -407,6 +407,13 @@ export async function getDaily(deps: AppDeps, userId: string) {
       .where('et_date', '=', date)
       .where('kind', '=', 'daily_award')
       .executeTakeFirst();
+    const charges = await trx
+      .selectFrom('daily_charges')
+      .select('charged')
+      .where('user_id', '=', userId)
+      .where('et_date', '=', date)
+      .executeTakeFirst();
+    const guessesUsed = charges?.charged ?? 0;
     const settings = await trx
       .selectFrom('notification_settings')
       .selectAll()
@@ -456,7 +463,10 @@ export async function getDaily(deps: AppDeps, userId: string) {
       announcement: {
         show: Boolean(feature) && (settings?.daily_poll_announcement ?? true) && !seen,
       },
-      reminders: { answering: (settings?.answering_reminder ?? false) && completed < DAILY_TARGET },
+      reminders: {
+        answering: (settings?.answering_reminder ?? false) && completed < DAILY_TARGET,
+        guessing: (settings?.guessing_reminder ?? false) && guessesUsed < 10,
+      },
     };
   });
 }

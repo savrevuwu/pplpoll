@@ -6,6 +6,7 @@ import type { AppDeps } from '../core/deps.js';
 import { errors } from '../core/errors.js';
 import { parse } from '../core/validate.js';
 import * as accounts from '../modules/accounts/service.js';
+import { playerStats } from '../modules/stats/service.js';
 import { schemas } from './auth.js';
 
 const ProfileBody = z.strictObject({ displayName: schemas.displayName.nullable() });
@@ -37,6 +38,14 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AppDeps): void
     const { username } = parse(z.strictObject({ username: z.string().max(20) }), req.params);
     const profile = await accounts.getPublicProfile(deps, username);
     if (!profile) throw errors.notFound();
-    return profile;
+    // Every profile shows Rarest Correct Guess (update §8) and the record badge (update §9).
+    const stats = await playerStats(deps.db, profile.userId);
+    return {
+      username: profile.username,
+      displayName: profile.displayName,
+      joinedAt: profile.joinedAt,
+      rarestCorrectGuess: stats.rarestCorrectGuess,
+      rarestGuessRecordHolder: stats.rarestGuessRecordHolder,
+    };
   });
 }

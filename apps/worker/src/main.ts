@@ -5,6 +5,7 @@ import {
   dispatchOutbox,
   loadSecrets,
   publishDaily,
+  computeSnapshots,
   runFinalDeletions,
   sendDeactivationWarnings,
   type EmailTransport,
@@ -58,6 +59,14 @@ await boss.schedule('daily.publish', every);
 await boss.work('daily.publish', async () => {
   const r = await publishDaily({ db }, new Date());
   if (r.status !== 'already_published') logger.info({ status: r.status }, 'daily poll publication');
+});
+
+// 24-hour result snapshots (spec §4): one per poll per ET day, shortly after midnight publication.
+await boss.createQueue('snapshots.compute');
+await boss.schedule('snapshots.compute', '*/10 * * * *');
+await boss.work('snapshots.compute', async () => {
+  const made = await computeSnapshots({ db }, new Date());
+  if (made) logger.info({ made }, 'result snapshots computed');
 });
 
 logger.info('worker started');

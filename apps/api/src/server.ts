@@ -7,6 +7,7 @@ import type { AppDeps } from './core/deps.js';
 import { AppError } from './core/errors.js';
 import { registerAccountRoutes } from './routes/account.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerGameRoutes } from './routes/games.js';
 import { registerHealth } from './routes/health.js';
 import { registerPollRoutes } from './routes/polls.js';
 import { registerStaffRoutes } from './routes/staff.js';
@@ -54,5 +55,6 @@ export async function buildServer(deps: AppDeps): Promise<FastifyInstance> {
   registerStaffRoutes(app, deps);
   registerPollRoutes(app, deps);
   registerSurveyRoutes(app, deps);
+  registerGameRoutes(app, deps);
   return app;
 }

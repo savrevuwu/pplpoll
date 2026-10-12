@@ -89,6 +89,16 @@ No internal contradiction was found between V2 §§1–22 and §§23–24.
 - Answering streak visibility settings (Everyone/Friends/Nobody) are applied with profiles in M6; today only the owner can see their own streaks.
 - Per-person limit: 60 answer submissions per minute.
 
+### 1.8 Milestone 4 engineering choices
+
+- **Grouping:** answers with the same normalized key count together; a plural folds into its singular when both were answered ("keys" → "key"); staff (moderator+) can merge synonyms/spellings, applied at the next snapshot. Group labels are the canonical key, capitalized (raw answers stay private).
+- **Guess matching:** exact key, plural variant, or one typo/adjacent swap for 5+ letter words — only when exactly one answer group is that close.
+- **Snapshots:** one immutable snapshot per poll per ET day (job runs every 10 minutes, idempotent). A game keeps the snapshot it started with. Eligible = 100+ respondents and K ≤ 17.
+- **Allowance:** starting reserves (no charge); the first accepted guess charges the ET date of that guess. If that day is already full (only possible across midnight), the guess is refused and the game is released with no charge and the poll is not marked played. Leaving before any accepted guess releases the reservation.
+- **Solo outcome:** reaching 60% wins; 3rd strike or using all guesses loses. Leaving after a guess is recorded as "abandoned" (charge kept, poll stays played) and is **not** counted as a completed game for stats or Rarest Correct Guess. _(Owner question S1: should abandoning count as a loss on leaderboards?)_
+- **Rarest Correct Guess:** lowest frozen share among correct guesses from won/lost (completed, valid) games; sitewide badge = everyone tied at the lowest share. Only percentages are shown, never the poll or answer.
+- Guess submissions share the per-person 60/min limit; guesses are stored with an identity sequence so same-millisecond guesses replay in exact order.
+
 ## 2. Architecture decision records
 
 | ADR     | Decision                                                                                                        | Status   |

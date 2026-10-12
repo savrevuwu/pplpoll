@@ -247,6 +247,109 @@ export interface Database {
     user_id: string;
     et_date: DateOnly;
   };
+  answer_groups: {
+    id: Generated<string>;
+    poll_id: string;
+    canonical_key: string;
+    label: string;
+    created_at: Timestamp;
+  };
+  answer_aliases: {
+    poll_id: string;
+    normalized_key: string;
+    canonical_key: string;
+    created_by: string;
+    created_at: Timestamp;
+  };
+  result_snapshots: {
+    id: Generated<string>;
+    poll_id: string;
+    et_date: DateOnly;
+    version: number;
+    respondents: number;
+    k: number | null;
+    guess_cap: number | null;
+    eligible: boolean;
+    ineligible_reason: string | null;
+    distribution: ColumnType<Record<string, number>, string, string>;
+    keymap: ColumnType<Record<string, string>, string, string>;
+    labels: ColumnType<Record<string, string>, string, string>;
+    grouping_version: number;
+    computed_at: Timestamp;
+  };
+  games: {
+    id: Generated<string>;
+    mode: 'solo';
+    poll_id: string;
+    snapshot_id: string;
+    user_id: string;
+    state: ColumnType<'active' | 'ended', 'active' | 'ended' | undefined, 'active' | 'ended'>;
+    outcome: 'won' | 'lost' | 'abandoned' | 'released' | null;
+    score_count: Generated<number>;
+    score_total: number;
+    strikes: Generated<number>;
+    accepted: Generated<number>;
+    correct_count: Generated<number>;
+    guess_cap: number;
+    reached_score_at: NullableTimestamp;
+    valid: Generated<boolean>;
+    created_at: Timestamp;
+    ended_at: NullableTimestamp;
+  };
+  game_participations: {
+    id: Generated<string>;
+    game_id: string;
+    user_id: string;
+    active: Generated<boolean>;
+    charge_et_date: ColumnType<string | null, string | null | undefined, string | null>;
+    first_guess_at: NullableTimestamp;
+    created_at: Timestamp;
+    ended_at: NullableTimestamp;
+  };
+  daily_charges: {
+    user_id: string;
+    et_date: DateOnly;
+    charged: number;
+  };
+  allowance_events: {
+    id: Generated<string>;
+    user_id: string;
+    participation_id: string;
+    kind: 'reserve' | 'charge' | 'release';
+    et_date: DateOnly;
+    at: Timestamp;
+  };
+  guesses: {
+    id: Generated<string>;
+    ord: Generated<string>;
+    game_id: string;
+    participation_id: string;
+    submitted_by: string;
+    client_request_id: string;
+    seq: number | null;
+    normalized_key: string;
+    group_id: string | null;
+    result: 'correct' | 'incorrect' | 'duplicate';
+    share_count: number | null;
+    share_total: number | null;
+    raw_text_enc: string;
+    at: Timestamp;
+  };
+  played_polls: {
+    user_id: string;
+    poll_id: string;
+    first_played_at: Timestamp;
+    last_played_at: Timestamp;
+    last_snapshot_id: string;
+    plays: Generated<number>;
+  };
+  player_rarest: {
+    user_id: string;
+    share_count: number;
+    share_total: number;
+    guess_id: string;
+    achieved_at: Timestamp;
+  };
 }
 
 // Return SQL `date` columns as 'YYYY-MM-DD' strings (America/New_York business dates), not JS Dates.

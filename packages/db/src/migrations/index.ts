@@ -3,6 +3,7 @@ import * as m0001 from './0001_baseline.js';
 import * as m0002 from './0002_identity.js';
 import * as m0003 from './0003_polls.js';
 import * as m0004 from './0004_surveys.js';
+import * as m0005 from './0005_guessing.js';
 
 /** Ordered registry. Never rename or reorder an applied migration; add new ones at the end. */
 export const migrations: Record<string, Migration> = {
@@ -10,4 +11,5 @@ export const migrations: Record<string, Migration> = {
   '0002_identity': m0002,
   '0003_polls': m0003,
   '0004_surveys': m0004,
+  '0005_guessing': m0005,
 };
